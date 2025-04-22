@@ -1,14 +1,14 @@
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
+use crossterm::event::{self, EnableMouseCapture, Event, KeyCode};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use ratatui::backend::CrosstermBackend;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Modifier, Style};
 
 use crossterm::execute;
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::Terminal;
 use ratatui::style::Color;
-use ratatui::text::{Span, Spans, Text};
+use ratatui::text::{Span, Line, Text};
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
 use std::io::{self, BufRead};
@@ -73,7 +73,7 @@ fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
             spans.push(Span::styled(c.to_string(), Style::default()));
         }
     }
-    ListItem::new(Text::from(vec![Spans::from(spans)]))
+    ListItem::new(Text::from(vec![Line::from(spans)]))
 }
 
 fn do_filter(
@@ -152,14 +152,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "".to_string()
             };
 
-            let divider_line = Paragraph::new(Spans::from(vec![
+            let divider_line = Paragraph::new(Line::from(vec![
                 Span::styled(label, Style::default().fg(Color::Gray)),
                 Span::raw(" "),
                 Span::styled(divider_fill, Style::default().fg(Color::DarkGray)),
             ]));
             f.render_widget(divider_line, chunks[1]);
 
-            let input_para = Paragraph::new(Text::from(vec![Spans::from(vec![
+            let input_para = Paragraph::new(Text::from(vec![Line::from(vec![
                 Span::styled("> ", Style::default().fg(Color::Blue)),
                 Span::raw(input.clone()),
             ])]))
