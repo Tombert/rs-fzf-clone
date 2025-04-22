@@ -4,68 +4,59 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
-use ratatui::Terminal;
-use std::io::{self, BufRead};
-use std::time::Duration;
-use regex::Regex;
-use ratatui::widgets::Paragraph;
-use ratatui::style::Color;
-use ratatui::text::{Span,Spans, Text};
 use crossterm::execute;
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
-
-fn fuzzy_regex(input: &str) -> Regex {
-    let pattern = input
-        .chars()
-        .map(|c| regex::escape(&c.to_string()) + ".*")
-        .collect::<String>();
-    Regex::new(&format!("(?i){}", pattern)).unwrap_or_else(|_| Regex::new(".*").unwrap())
-}
+use ratatui::Terminal;
+use ratatui::style::Color;
+use ratatui::text::{Span, Spans, Text};
+use ratatui::widgets::Paragraph;
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
+use std::io::{self, BufRead};
+use std::time::Duration;
 
 fn get_delta(input: &Vec<usize>) -> usize {
-    let mut delta = 0; 
+    let mut delta = 0;
     if input.len() > 1 {
         for i in input.windows(2) {
-            let first = i[0]; 
-            let second = i[1]; 
-            delta += second - first; 
+            let first = i[0];
+            let second = i[1];
+            delta += second - first;
         }
     }
 
     delta
 }
 
-fn fuzzy_search(input: &str, line : &str) -> Option<(String, Vec<usize>)>{
-    let mut input_index = 0; 
+fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
+    let mut input_index = 0;
     let input_chars: Vec<char> = input.chars().collect();
     let input_length = input.len();
-    let mut counter = 0; 
-    let mut hits : Vec<usize> = Vec::new();
+    let mut counter = 0;
+    let mut hits: Vec<usize> = Vec::new();
     let line_length = line.len();
-    if input_length > 0  {
+    if input_length > 0 {
         for (i, cc) in line.chars().enumerate() {
             let current = input_chars.get(input_index).unwrap().to_ascii_lowercase();
 
             if cc.to_ascii_lowercase() == current {
-                input_index += 1; 
-                hits.push(counter); 
+                input_index += 1;
+                hits.push(counter);
 
                 if input_index >= input_length {
-                    break; 
+                    break;
                 }
             } else if i == line_length - 1 {
-                return None
+                return None;
             }
 
-            counter += 1; 
+            counter += 1;
         }
     }
 
     if input_index < input_length {
         return None;
     }
-    return Some((line.to_string(), hits)); 
+    return Some((line.to_string(), hits));
 }
 
 fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
@@ -73,20 +64,50 @@ fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     for (i, c) in line.chars().enumerate() {
         if hits.contains(&i) {
             spans.push(Span::styled(
-                    c.to_string(),
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                c.to_string(),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
             ));
         } else {
-            spans.push(Span::raw(c.to_string()));
+            spans.push(Span::styled(c.to_string(), Style::default()));
         }
     }
     ListItem::new(Text::from(vec![Spans::from(spans)]))
 }
 
+fn do_filter(
+    filtered_lines: &mut Vec<(String, Vec<usize>)>,
+    all_lines: &Vec<(String, Vec<usize>)>,
+    input: &String,
+    selected: &mut Option<usize>,
+) {
+    let mut filtered_lines2: Vec<(String, Vec<usize>)> = all_lines
+        .iter()
+        .filter_map(|(line, _)| fuzzy_search(&input, line))
+        .collect();
+
+    filtered_lines2.sort_by_key(|(_, hits)| get_delta(hits));
+    filtered_lines2.reverse();
+
+    *filtered_lines = filtered_lines2;
+
+    if !filtered_lines.is_empty() {
+        *selected = Some(filtered_lines.len() - 1);
+    } else {
+        *selected = None;
+    }
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdin = io::stdin();
-    let all_lines: Vec<(String, Vec<usize>)> = stdin.lock().lines().filter_map(Result::ok).map(|s| (s, Vec::new())).collect();
+    let all_lines: Vec<(String, Vec<usize>)> = stdin
+        .lock()
+        .lines()
+        .filter_map(Result::ok)
+        .map(|s| (s, Vec::new()))
+        .collect();
+    let total_len = all_lines.len();
     let mut filtered_lines = all_lines.clone();
     let mut selected = if !filtered_lines.is_empty() {
         Some(filtered_lines.len() - 1) // or just Some(0)
@@ -103,7 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     execute!(screen, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(screen);
     let mut terminal = Terminal::new(backend)?;
-    let mut cursor_position = 0; 
+    let mut cursor_position = 0;
 
     terminal.clear()?;
     loop {
@@ -112,12 +133,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
-                .constraints([Constraint::Min(1), Constraint::Length(1), Constraint::Length(3)].as_ref())
+                .constraints(
+                    [
+                        Constraint::Min(1),
+                        Constraint::Length(1),
+                        Constraint::Length(3),
+                    ]
+                    .as_ref(),
+                )
                 .split(size);
 
-            let total = filtered_lines.len();
             let selected_display = selected.unwrap_or(0) + 1; // 1-based indexing
-            let label = format!("[ {}/{} ]", selected_display, total);
+            let label = format!("[ {}/{} ]", selected_display, total_len);
             let label_width = label.len() as u16;
             let divider_fill = if chunks[1].width > label_width {
                 "─".repeat((chunks[1].width - label_width - 1) as usize)
@@ -126,19 +153,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             let divider_line = Paragraph::new(Spans::from(vec![
-                    Span::styled(label, Style::default().fg(Color::Gray)),
-                    Span::raw(" "),
-                    Span::styled(divider_fill, Style::default().fg(Color::DarkGray)),
+                Span::styled(label, Style::default().fg(Color::Gray)),
+                Span::raw(" "),
+                Span::styled(divider_fill, Style::default().fg(Color::DarkGray)),
             ]));
             f.render_widget(divider_line, chunks[1]);
 
-            let input_para = Paragraph::new(Text::from(vec![
-                    Spans::from(vec![
-                        Span::styled("> ", Style::default().fg(Color::Blue)),
-                        Span::raw(input.clone()),
-                    ]),
-            ]))
-                .block(Block::default().borders(Borders::NONE));
+            let input_para = Paragraph::new(Text::from(vec![Spans::from(vec![
+                Span::styled("> ", Style::default().fg(Color::Blue)),
+                Span::raw(input.clone()),
+            ])]))
+            .block(Block::default().borders(Borders::NONE));
             f.render_widget(input_para, chunks[2]);
             f.set_cursor(chunks[2].x + 2 + cursor_position as u16, chunks[2].y);
 
@@ -146,7 +171,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let actual_items_to_show = filtered_lines.len().min(list_height);
 
             let padding_rows = list_height.saturating_sub(actual_items_to_show);
-            let mut items: Vec<ListItem> = Vec::new();
 
             let (items_to_render, real_selected) = if filtered_lines.len() <= list_height {
                 // Not enough items to fill the view, so pad the top
@@ -154,8 +178,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .map(|_| ListItem::new(""))
                     .chain(
                         filtered_lines
-                        .iter()
-                        .map(|(line, hits)| styled_line(line, hits)),
+                            .iter()
+                            .map(|(line, hits)| styled_line(line, hits)),
                     )
                     .collect::<Vec<_>>();
 
@@ -185,133 +209,144 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if event::poll(Duration::from_millis(100))? {
             match event::read()? {
-                Event::Key(key) => match key.code {
-                    KeyCode::Char('b') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        if cursor_position > 0 {
-                            cursor_position -= 1;
-                        }
-                    },
-                    KeyCode::Char('f') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        if cursor_position < input.len() {
-                            cursor_position += 1;
-                        }
+                Event::Key(key) => {
+                    enum Action {
+                        MoveLeft,
+                        MoveRight,
+                        MoveUp,
+                        MoveDown,
+                        MoveEnd,
+                        MoveBegin,
+                        Exit,
+                        Select,
+                        Other,
                     }
-                    KeyCode::Right => {
-                        if cursor_position < input.len() {
-                            cursor_position += 1;
+
+                    let action = match key.code {
+                        KeyCode::Enter => Action::Select,
+                        KeyCode::Esc => Action::Exit,
+                        KeyCode::Char('c')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            Action::Exit
                         }
-                    }
-                    KeyCode::Left  => {
-                        if cursor_position > 0 {
-                            cursor_position -= 1;
+                        KeyCode::Char('e')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            Action::MoveEnd
                         }
-                    },
-                    KeyCode::Char('p') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        if let Some(new_selected) = selected {
-                            if new_selected > 0 {
-                                selected = Some(new_selected - 1);
+                        KeyCode::Char('a')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            Action::MoveBegin
+                        }
+
+                        KeyCode::Up => Action::MoveUp,
+                        KeyCode::Char('p')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            Action::MoveUp
+                        }
+                        KeyCode::Down => Action::MoveDown,
+                        KeyCode::Char('n')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            Action::MoveDown
+                        }
+                        KeyCode::Left => Action::MoveLeft,
+                        KeyCode::Char('b')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            Action::MoveLeft
+                        }
+                        KeyCode::Right => Action::MoveRight,
+                        KeyCode::Char('f')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            Action::MoveRight
+                        }
+                        _ => Action::Other,
+                    };
+
+                    match action {
+                        Action::Select => {
+                            if let Some(sel) = selected {
+                                if let Some(line) = filtered_lines.get(sel) {
+                                    disable_raw_mode()?;
+                                    execute!(io::stderr(), LeaveAlternateScreen)?;
+                                    println!("{}", line.0);
+                                    return Ok(());
+                                }
                             }
                         }
-                    }
-                    KeyCode::Char('n') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        if let Some(new_selected) = selected {
-                            if new_selected + 1 < filtered_lines.len() {
-                                selected = Some(new_selected + 1);
+                        Action::Exit => {
+                            disable_raw_mode()?;
+                            execute!(io::stderr(), LeaveAlternateScreen)?;
+                            return Ok(());
+                        }
+                        Action::MoveBegin => {
+                            cursor_position = 0;
+                        }
+                        Action::MoveEnd => {
+                            cursor_position = input.len();
+                        }
+                        Action::MoveLeft => {
+                            if cursor_position > 0 {
+                                cursor_position -= 1;
                             }
                         }
-                    }
-                    KeyCode::Char('a') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        cursor_position = 0; 
-                    }
-                    KeyCode::Char('e') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        cursor_position = input.len(); 
-                    }
-                    KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        disable_raw_mode()?;
-                        execute!(io::stderr(), LeaveAlternateScreen)?;
-                        return Ok(());
-                    }
-                    KeyCode::Char(c) => {
-                        if cursor_position <= input.len() {
-                            input.insert(cursor_position, c);
-                            cursor_position += 1;
-                        }
-
-
-                        //input.push(c);
-                        let mut filtered_lines2: Vec<(String, Vec<usize>)> = all_lines
-                            .iter()
-                            .filter_map(|(line, _)| fuzzy_search(&input, line))
-                            .collect();
-
-                        filtered_lines2.sort_by_key(|(_, hits)| get_delta(hits));
-                        filtered_lines2.reverse();
-
-                        filtered_lines = filtered_lines2;
-
-
-                        if !filtered_lines.is_empty() {
-                            selected = Some(filtered_lines.len()-1);
-                        } else {
-                            selected = None;
-                        }
-                    }
-                    KeyCode::Backspace => {
-                        if cursor_position > 0 {
-                            input.remove(cursor_position - 1);
-                            cursor_position -= 1;
-                        }
-
-                        let mut filtered_lines2: Vec<(String, Vec<usize>)> = all_lines
-                            .iter()
-                            .filter_map(|(line, _)| fuzzy_search(&input, line))
-                            .collect();
-
-                        filtered_lines2.sort_by_key(|(_, hits)| get_delta(hits));
-                        filtered_lines2.reverse();
-
-
-                        filtered_lines = filtered_lines2;
-
-                        if !filtered_lines.is_empty() {
-                            selected = Some(filtered_lines.len()-1);
-                        } else {
-                            selected = None;
-                        }
-                    }
-                    KeyCode::Up => {
-                        if let Some(new_selected) = selected {
-                            if new_selected > 0 {
-                                selected = Some(new_selected - 1);
-                                //list_state.select(selected);
+                        Action::MoveRight => {
+                            if cursor_position < input.len() {
+                                cursor_position += 1;
                             }
                         }
-                    }
-                    KeyCode::Down => {
-                        if let Some(new_selected) = selected {
-                            if new_selected + 1 < filtered_lines.len() {
-                                selected = Some(new_selected + 1);
-                                //list_state.select(selected);
+                        Action::MoveUp => {
+                            if let Some(new_selected) = selected {
+                                if new_selected > 0 {
+                                    selected = Some(new_selected - 1);
+                                }
                             }
                         }
-                    }
-                    KeyCode::Enter => {
-                        if let Some(sel) = selected {
-                            if let Some(line) = filtered_lines.get(sel) {
-                                disable_raw_mode()?;
-                                execute!(io::stderr(), LeaveAlternateScreen)?;
-                                println!("{}", line.0);
-                                return Ok(());
+                        Action::MoveDown => {
+                            if let Some(new_selected) = selected {
+                                if new_selected + 1 < filtered_lines.len() {
+                                    selected = Some(new_selected + 1);
+                                }
                             }
                         }
+                        Action::Other => match key.code {
+                            KeyCode::Char(c) => {
+                                if cursor_position <= input.len() {
+                                    input.insert(cursor_position, c);
+                                    cursor_position += 1;
+                                }
+                                do_filter(&mut filtered_lines, &all_lines, &input, &mut selected);
+                            }
+                            KeyCode::Backspace => {
+                                if cursor_position > 0 {
+                                    input.remove(cursor_position - 1);
+                                    cursor_position -= 1;
+                                }
+                                do_filter(&mut filtered_lines, &all_lines, &input, &mut selected);
+                            }
+                            _ => {}
+                        },
                     }
-                    KeyCode::Esc => {
-                        disable_raw_mode()?;
-                        execute!(io::stderr(), LeaveAlternateScreen)?;
-                        return Ok(());
-                    }
-                    _ => {}
-                },
+                }
                 _ => {}
             }
         }
