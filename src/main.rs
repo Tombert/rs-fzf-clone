@@ -101,6 +101,181 @@ fn do_filter(
     }
 }
 
+
+fn do_handle(cursor_position : &mut usize, 
+    input : &mut String,
+    filtered_lines: &mut Vec<(String, Vec<usize>)>,
+    all_lines: &Vec<(String, Vec<usize>)>,
+    selected: &mut Option<usize>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+    match event::read()? {
+        Event::Key(key) => {
+            enum Action {
+                MoveLeft,
+                MoveRight,
+                MoveUp,
+                MoveDown,
+                MoveEnd,
+                MoveBegin,
+                Exit,
+                Select,
+                ClearAll, 
+                Other,
+            }
+
+            let action = match key.code {
+                KeyCode::Enter => Action::Select,
+                KeyCode::Esc => Action::Exit,
+                KeyCode::Char('u')
+                    if key
+                        .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
+                        Action::ClearAll
+                    }
+                KeyCode::Char('c')
+                    if key
+                        .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
+                        Action::Exit
+                    }
+                KeyCode::Char('e')
+                    if key
+                        .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
+                        Action::MoveEnd
+                    }
+                KeyCode::Char('a')
+                    if key
+                        .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
+                        Action::MoveBegin
+                    }
+
+                KeyCode::Up => Action::MoveUp,
+                KeyCode::Char('p')
+                    if key
+                        .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
+                        Action::MoveUp
+                    }
+                KeyCode::Down => Action::MoveDown,
+                KeyCode::Char('n')
+                    if key
+                        .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
+                        Action::MoveDown
+                    }
+                KeyCode::Left => Action::MoveLeft,
+                KeyCode::Char('b')
+                    if key
+                        .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
+                        Action::MoveLeft
+                    }
+                KeyCode::Right => Action::MoveRight,
+                KeyCode::Char('f')
+                    if key
+                        .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
+                        Action::MoveRight
+                    }
+                _ => Action::Other,
+            };
+
+            match action {
+                Action::ClearAll => {
+                    *cursor_position =  0;
+                    input.clear();
+                    do_filter(filtered_lines, &all_lines, &input, selected);
+                    Ok(())
+                },
+                Action::Select => {
+                    if let Some(sel) = selected {
+                        if let Some(line) = filtered_lines.get(*sel) {
+                            disable_raw_mode()?;
+                            execute!(io::stderr(), LeaveAlternateScreen)?;
+                            println!("{}", line.0);
+                            std::process::exit(0);
+                        }
+                    }
+                    Ok(())
+                }
+                Action::Exit => {
+                    disable_raw_mode()?;
+                    execute!(io::stderr(), LeaveAlternateScreen)?;
+                    std::process::exit(0);
+                }
+                Action::MoveBegin => {
+                    *cursor_position = 0;
+                    Ok(())
+                }
+                Action::MoveEnd => {
+                    *cursor_position = input.len();
+                    Ok(())
+                }
+                Action::MoveLeft => {
+                    if *cursor_position > 0 {
+                        *cursor_position -= 1;
+                    }
+                    Ok(())
+                }
+                Action::MoveRight => {
+                    if *cursor_position < input.len() {
+                        *cursor_position += 1;
+                    }
+                    Ok(())
+                }
+                Action::MoveUp => {
+                    if let Some(new_selected) = selected {
+                        let ns = new_selected.clone(); 
+                        if ns > 0 {
+                            *selected =  Some(ns - 1);
+                        }
+                    }
+                    Ok(())
+                }
+                Action::MoveDown => {
+                    if let Some(new_selected) = selected {
+                        let ns = new_selected.clone(); 
+                        if ns + 1 < filtered_lines.len() {
+                            *selected =  Some(ns + 1);
+                        }
+                    }
+                    Ok(())
+                }
+                Action::Other => match key.code {
+                    KeyCode::Char(c) => {
+                        if *cursor_position <= input.len() {
+                            input.insert(*cursor_position, c);
+                            *cursor_position += 1;
+                        }
+                        do_filter(filtered_lines, &all_lines, &input, selected);
+                    Ok(())
+                    }
+                    KeyCode::Backspace => {
+                        if *cursor_position > 0 {
+                            input.remove(*cursor_position - 1);
+                            *cursor_position -= 1;
+                        }
+                        do_filter(filtered_lines, &all_lines, &input, selected);
+                    Ok(())
+                    }
+                    _ => Ok(())
+                },
+            }
+        }
+        _ => Ok(())
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdin = io::stdin();
     let all_lines: Vec<(String, Vec<usize>)> = stdin
@@ -210,160 +385,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?;
 
         if event::poll(Duration::from_millis(100))? {
-            match event::read()? {
-                Event::Key(key) => {
-                    enum Action {
-                        MoveLeft,
-                        MoveRight,
-                        MoveUp,
-                        MoveDown,
-                        MoveEnd,
-                        MoveBegin,
-                        Exit,
-                        Select,
-                        ClearAll, 
-                        Other,
-                    }
-
-                    let action = match key.code {
-                        KeyCode::Enter => Action::Select,
-                        KeyCode::Esc => Action::Exit,
-                        KeyCode::Char('u')
-                            if key
-                                .modifiers
-                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            Action::ClearAll
-                        }
-                        KeyCode::Char('c')
-                            if key
-                                .modifiers
-                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            Action::Exit
-                        }
-                        KeyCode::Char('e')
-                            if key
-                                .modifiers
-                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            Action::MoveEnd
-                        }
-                        KeyCode::Char('a')
-                            if key
-                                .modifiers
-                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            Action::MoveBegin
-                        }
-
-                        KeyCode::Up => Action::MoveUp,
-                        KeyCode::Char('p')
-                            if key
-                                .modifiers
-                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            Action::MoveUp
-                        }
-                        KeyCode::Down => Action::MoveDown,
-                        KeyCode::Char('n')
-                            if key
-                                .modifiers
-                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            Action::MoveDown
-                        }
-                        KeyCode::Left => Action::MoveLeft,
-                        KeyCode::Char('b')
-                            if key
-                                .modifiers
-                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            Action::MoveLeft
-                        }
-                        KeyCode::Right => Action::MoveRight,
-                        KeyCode::Char('f')
-                            if key
-                                .modifiers
-                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            Action::MoveRight
-                        }
-                        _ => Action::Other,
-                    };
-
-                    match action {
-                        Action::ClearAll => {
-                            cursor_position = 0;
-                            input.clear();
-                            do_filter(&mut filtered_lines, &all_lines, &input, &mut selected);
-                        },
-                        Action::Select => {
-                            if let Some(sel) = selected {
-                                if let Some(line) = filtered_lines.get(sel) {
-                                    disable_raw_mode()?;
-                                    execute!(io::stderr(), LeaveAlternateScreen)?;
-                                    println!("{}", line.0);
-                                    return Ok(());
-                                }
-                            }
-                        }
-                        Action::Exit => {
-                            disable_raw_mode()?;
-                            execute!(io::stderr(), LeaveAlternateScreen)?;
-                            return Ok(());
-                        }
-                        Action::MoveBegin => {
-                            cursor_position = 0;
-                        }
-                        Action::MoveEnd => {
-                            cursor_position = input.len();
-                        }
-                        Action::MoveLeft => {
-                            if cursor_position > 0 {
-                                cursor_position -= 1;
-                            }
-                        }
-                        Action::MoveRight => {
-                            if cursor_position < input.len() {
-                                cursor_position += 1;
-                            }
-                        }
-                        Action::MoveUp => {
-                            if let Some(new_selected) = selected {
-                                if new_selected > 0 {
-                                    selected = Some(new_selected - 1);
-                                }
-                            }
-                        }
-                        Action::MoveDown => {
-                            if let Some(new_selected) = selected {
-                                if new_selected + 1 < filtered_lines.len() {
-                                    selected = Some(new_selected + 1);
-                                }
-                            }
-                        }
-                        Action::Other => match key.code {
-                            KeyCode::Char(c) => {
-                                if cursor_position <= input.len() {
-                                    input.insert(cursor_position, c);
-                                    cursor_position += 1;
-                                }
-                                do_filter(&mut filtered_lines, &all_lines, &input, &mut selected);
-                            }
-                            KeyCode::Backspace => {
-                                if cursor_position > 0 {
-                                    input.remove(cursor_position - 1);
-                                    cursor_position -= 1;
-                                }
-                                do_filter(&mut filtered_lines, &all_lines, &input, &mut selected);
-                            }
-                            _ => {}
-                        },
-                    }
-                }
-                _ => {}
-            }
+            let _ = do_handle(&mut cursor_position, &mut input, &mut filtered_lines, &all_lines, &mut selected);
         }
     }
 }
