@@ -219,12 +219,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         MoveBegin,
                         Exit,
                         Select,
+                        ClearAll, 
                         Other,
                     }
 
                     let action = match key.code {
                         KeyCode::Enter => Action::Select,
                         KeyCode::Esc => Action::Exit,
+                        KeyCode::Char('u')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            Action::ClearAll
+                        }
                         KeyCode::Char('c')
                             if key
                                 .modifiers
@@ -283,6 +291,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
 
                     match action {
+                        Action::ClearAll => {
+                            cursor_position = 0;
+                            input.clear();
+                            do_filter(&mut filtered_lines, &all_lines, &input, &mut selected);
+                        },
                         Action::Select => {
                             if let Some(sel) = selected {
                                 if let Some(line) = filtered_lines.get(sel) {
