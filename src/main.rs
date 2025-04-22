@@ -45,7 +45,6 @@ fn fuzzy_search(input: &str, line : &str) -> Option<(String, Vec<usize>)>{
     let line_length = line.len();
     if input_length > 0  {
         for (i, cc) in line.chars().enumerate() {
-
             let current = input_chars.get(input_index).unwrap().to_ascii_lowercase();
 
             if cc.to_ascii_lowercase() == current {
@@ -208,7 +207,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Char('e') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                         cursor_position = input.len(); 
                         }
-                    KeyCode::Char('c') => {
+                    KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                         disable_raw_mode()?;
                         execute!(io::stderr(), LeaveAlternateScreen)?;
                         return Ok(());
