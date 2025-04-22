@@ -8,7 +8,7 @@ use crossterm::execute;
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::Terminal;
 use ratatui::style::Color;
-use ratatui::text::{Span, Line, Text};
+use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
 
@@ -101,13 +101,13 @@ fn do_filter(
     }
 }
 
-
-fn do_handle(cursor_position : &mut usize, 
-    input : &mut String,
+fn do_handle(
+    cursor_position: &mut usize,
+    input: &mut String,
     filtered_lines: &mut Vec<(String, Vec<usize>)>,
     all_lines: &Vec<(String, Vec<usize>)>,
     selected: &mut Option<usize>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error>> {
     match event::read()? {
         Event::Key(key) => {
             enum Action {
@@ -119,7 +119,7 @@ fn do_handle(cursor_position : &mut usize,
                 MoveBegin,
                 Exit,
                 Select,
-                ClearAll, 
+                ClearAll,
                 Other,
             }
 
@@ -129,74 +129,74 @@ fn do_handle(cursor_position : &mut usize,
                 KeyCode::Char('u')
                     if key
                         .modifiers
-                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                    {
-                        Action::ClearAll
-                    }
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::ClearAll
+                }
                 KeyCode::Char('c')
                     if key
                         .modifiers
-                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                    {
-                        Action::Exit
-                    }
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::Exit
+                }
                 KeyCode::Char('e')
                     if key
                         .modifiers
-                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                    {
-                        Action::MoveEnd
-                    }
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveEnd
+                }
                 KeyCode::Char('a')
                     if key
                         .modifiers
-                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                    {
-                        Action::MoveBegin
-                    }
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveBegin
+                }
 
                 KeyCode::Up => Action::MoveUp,
                 KeyCode::Char('p')
                     if key
                         .modifiers
-                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                    {
-                        Action::MoveUp
-                    }
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveUp
+                }
                 KeyCode::Down => Action::MoveDown,
                 KeyCode::Char('n')
                     if key
                         .modifiers
-                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                    {
-                        Action::MoveDown
-                    }
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveDown
+                }
                 KeyCode::Left => Action::MoveLeft,
                 KeyCode::Char('b')
                     if key
                         .modifiers
-                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                    {
-                        Action::MoveLeft
-                    }
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveLeft
+                }
                 KeyCode::Right => Action::MoveRight,
                 KeyCode::Char('f')
                     if key
                         .modifiers
-                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                    {
-                        Action::MoveRight
-                    }
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveRight
+                }
                 _ => Action::Other,
             };
 
             match action {
                 Action::ClearAll => {
-                    *cursor_position =  0;
+                    *cursor_position = 0;
                     input.clear();
                     do_filter(filtered_lines, &all_lines, &input, selected);
                     Ok(())
-                },
+                }
                 Action::Select => {
                     if let Some(sel) = selected {
                         if let Some(line) = filtered_lines.get(*sel) {
@@ -235,18 +235,18 @@ fn do_handle(cursor_position : &mut usize,
                 }
                 Action::MoveUp => {
                     if let Some(new_selected) = selected {
-                        let ns = new_selected.clone(); 
+                        let ns = new_selected.clone();
                         if ns > 0 {
-                            *selected =  Some(ns - 1);
+                            *selected = Some(ns - 1);
                         }
                     }
                     Ok(())
                 }
                 Action::MoveDown => {
                     if let Some(new_selected) = selected {
-                        let ns = new_selected.clone(); 
+                        let ns = new_selected.clone();
                         if ns + 1 < filtered_lines.len() {
-                            *selected =  Some(ns + 1);
+                            *selected = Some(ns + 1);
                         }
                     }
                     Ok(())
@@ -258,7 +258,7 @@ fn do_handle(cursor_position : &mut usize,
                             *cursor_position += 1;
                         }
                         do_filter(filtered_lines, &all_lines, &input, selected);
-                    Ok(())
+                        Ok(())
                     }
                     KeyCode::Backspace => {
                         if *cursor_position > 0 {
@@ -266,13 +266,13 @@ fn do_handle(cursor_position : &mut usize,
                             *cursor_position -= 1;
                         }
                         do_filter(filtered_lines, &all_lines, &input, selected);
-                    Ok(())
+                        Ok(())
                     }
-                    _ => Ok(())
+                    _ => Ok(()),
                 },
             }
         }
-        _ => Ok(())
+        _ => Ok(()),
     }
 }
 
@@ -385,7 +385,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?;
 
         if event::poll(Duration::from_millis(100))? {
-            let _ = do_handle(&mut cursor_position, &mut input, &mut filtered_lines, &all_lines, &mut selected);
+            let _ = do_handle(
+                &mut cursor_position,
+                &mut input,
+                &mut filtered_lines,
+                &all_lines,
+                &mut selected,
+            );
         }
     }
 }
