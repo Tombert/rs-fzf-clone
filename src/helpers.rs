@@ -1,21 +1,12 @@
-use crossterm::event::{self, EnableMouseCapture, Event, KeyCode};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use ratatui::backend::CrosstermBackend;
-use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::style::{Modifier, Style};
+use crossterm::event::{self, Event, KeyCode};
+use crossterm::terminal::disable_raw_mode ;
 
 
 use crossterm::execute;
-use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
-use ratatui::Terminal;
-use ratatui::style::Color;
-use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::Paragraph;
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
+use crossterm::terminal::LeaveAlternateScreen;
 
 use rayon::prelude::*;
-use std::io::{self, BufRead};
-use std::time::Duration;
+use std::io::{self};
 
 fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
     let mut input_index = 0;

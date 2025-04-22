@@ -1,11 +1,11 @@
-use crossterm::event::{self, EnableMouseCapture, Event, KeyCode};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crossterm::event::{self, EnableMouseCapture };
+use crossterm::terminal:: enable_raw_mode;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Modifier, Style};
 
 use crossterm::execute;
-use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::terminal::EnterAlternateScreen;
 use ratatui::Terminal;
 use ratatui::style::Color;
 use ratatui::text::{Line, Span, Text};
