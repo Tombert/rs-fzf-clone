@@ -11,6 +11,8 @@ use ratatui::style::Color;
 use ratatui::text::{Span, Line, Text};
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
+
+use rayon::prelude::*;
 use std::io::{self, BufRead};
 use std::time::Duration;
 
@@ -83,11 +85,11 @@ fn do_filter(
     selected: &mut Option<usize>,
 ) {
     let mut filtered_lines2: Vec<(String, Vec<usize>)> = all_lines
-        .iter()
+        .par_iter()
         .filter_map(|(line, _)| fuzzy_search(&input, line))
         .collect();
 
-    filtered_lines2.sort_by_key(|(_, hits)| get_delta(hits));
+    filtered_lines2.par_sort_by_key(|(_, hits)| get_delta(hits));
     filtered_lines2.reverse();
 
     *filtered_lines = filtered_lines2;
@@ -189,7 +191,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Too many items, so scroll normally from the top
                 let start_idx = filtered_lines.len() - list_height;
                 let items = filtered_lines
-                    .iter()
+                    .par_iter()
                     .skip(start_idx)
                     .take(list_height)
                     .map(|(line, hits)| styled_line(line, hits))
