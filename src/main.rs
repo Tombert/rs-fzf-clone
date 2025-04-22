@@ -73,8 +73,8 @@ fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     for (i, c) in line.chars().enumerate() {
         if hits.contains(&i) {
             spans.push(Span::styled(
-                c.to_string(),
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                    c.to_string(),
+                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             ));
         } else {
             spans.push(Span::raw(c.to_string()));
@@ -94,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
     let mut list_state = ListState::default();
-   // list_state.select(selected);
+    // list_state.select(selected);
     let mut input = String::new();
     //list_state.select(Some(selected));
 
@@ -112,12 +112,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
-                .constraints([Constraint::Min(1),Constraint::Length(1),  Constraint::Length(3)].as_ref())
+                .constraints([Constraint::Min(1), Constraint::Length(1), Constraint::Length(3)].as_ref())
                 .split(size);
 
-
             let total = filtered_lines.len();
-            let selected_display = selected.unwrap_or(0) + 1; // show 1-based indexing
+            let selected_display = selected.unwrap_or(0) + 1; // 1-based indexing
             let label = format!("[ {}/{} ]", selected_display, total);
             let label_width = label.len() as u16;
             let divider_fill = if chunks[1].width > label_width {
@@ -141,22 +140,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ]))
                 .block(Block::default().borders(Borders::NONE));
             f.render_widget(input_para, chunks[2]);
-            f.set_cursor(chunks[2].x + 2  + cursor_position as u16, chunks[2].y);
+            f.set_cursor(chunks[2].x + 2 + cursor_position as u16, chunks[2].y);
 
             let list_height = chunks[0].height as usize;
-            let padding_rows = list_height.saturating_sub(filtered_lines.len());
-            let real_selected = selected.map(|f| f + padding_rows);
-            let mut items: Vec<ListItem> = Vec::with_capacity(list_height);
-            for _ in 0..padding_rows {
-                items.push(ListItem::new("")); // blank spacer rows
-            }
-            items.extend(
-                filtered_lines
-                .iter()
-                .map(|(line, hits)| styled_line(line, hits))
-            );
+            let actual_items_to_show = filtered_lines.len().min(list_height);
 
-            let list = List::new(items)
+            let padding_rows = list_height.saturating_sub(actual_items_to_show);
+            let mut items: Vec<ListItem> = Vec::new();
+
+            let (items_to_render, real_selected) = if filtered_lines.len() <= list_height {
+                // Not enough items to fill the view, so pad the top
+                let padded_items = (0..padding_rows)
+                    .map(|_| ListItem::new(""))
+                    .chain(
+                        filtered_lines
+                        .iter()
+                        .map(|(line, hits)| styled_line(line, hits)),
+                    )
+                    .collect::<Vec<_>>();
+
+                let real_selected = selected.map(|sel| sel + padding_rows);
+                (padded_items, real_selected)
+            } else {
+                // Too many items, so scroll normally from the top
+                let start_idx = filtered_lines.len() - list_height;
+                let items = filtered_lines
+                    .iter()
+                    .skip(start_idx)
+                    .take(list_height)
+                    .map(|(line, hits)| styled_line(line, hits))
+                    .collect::<Vec<_>>();
+
+                let real_selected = selected.map(|sel| sel.saturating_sub(start_idx));
+                (items, real_selected)
+            };
+
+            let list = List::new(items_to_render)
                 .block(Block::default().borders(Borders::NONE))
                 .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
@@ -167,46 +186,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if event::poll(Duration::from_millis(100))? {
             match event::read()? {
                 Event::Key(key) => match key.code {
-                   KeyCode::Char('b') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                    KeyCode::Char('b') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                         if cursor_position > 0 {
                             cursor_position -= 1;
                         }
                     },
-                   KeyCode::Char('f') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                    KeyCode::Char('f') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                         if cursor_position < input.len() {
                             cursor_position += 1;
                         }
                     }
-                   KeyCode::Right => {
+                    KeyCode::Right => {
                         if cursor_position < input.len() {
                             cursor_position += 1;
                         }
                     }
-                   KeyCode::Left  => {
+                    KeyCode::Left  => {
                         if cursor_position > 0 {
                             cursor_position -= 1;
                         }
                     },
                     KeyCode::Char('p') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                            if let Some(new_selected) = selected {
-                                if new_selected > 0 {
-                                    selected = Some(new_selected - 1);
-                                }
+                        if let Some(new_selected) = selected {
+                            if new_selected > 0 {
+                                selected = Some(new_selected - 1);
                             }
                         }
+                    }
                     KeyCode::Char('n') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                            if let Some(new_selected) = selected {
-                                if new_selected + 1 < filtered_lines.len() {
-                                    selected = Some(new_selected + 1);
-                                }
+                        if let Some(new_selected) = selected {
+                            if new_selected + 1 < filtered_lines.len() {
+                                selected = Some(new_selected + 1);
                             }
                         }
+                    }
                     KeyCode::Char('a') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                         cursor_position = 0; 
-                        }
+                    }
                     KeyCode::Char('e') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                         cursor_position = input.len(); 
-                        }
+                    }
                     KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                         disable_raw_mode()?;
                         execute!(io::stderr(), LeaveAlternateScreen)?;
