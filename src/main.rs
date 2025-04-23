@@ -53,9 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
     let mut list_state = ListState::default();
-    // list_state.select(selected);
     let mut input = String::new();
-    //list_state.select(Some(selected));
 
     enable_raw_mode()?;
     let mut screen = io::stderr();

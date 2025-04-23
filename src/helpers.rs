@@ -96,10 +96,13 @@ pub fn do_handle(
                 Exit,
                 Select,
                 ClearAll,
+                BackSpace,
                 Other,
+                Key(char)
             }
 
             let action = match key.code {
+                KeyCode::Backspace => Action::BackSpace,
                 KeyCode::Enter => Action::Select,
                 KeyCode::Esc => Action::Exit,
                 KeyCode::Char('u')
@@ -163,10 +166,28 @@ pub fn do_handle(
                 {
                     Action::MoveRight
                 }
+                KeyCode::Char(c) => Action::Key(c),
                 _ => Action::Other,
             };
 
             match action {
+                Action::Key(c) => {
+                    if *cursor_position <= input.len() {
+                        input.insert(*cursor_position, c);
+                        *cursor_position += 1;
+                    }
+                    do_filter(filtered_lines, &all_lines, &input, selected);
+                    Ok(())
+
+                },
+                Action::BackSpace => {
+                    if *cursor_position > 0 {
+                        input.remove(*cursor_position - 1);
+                        *cursor_position -= 1;
+                    }
+                    do_filter(filtered_lines, &all_lines, &input, selected);
+                    Ok(())
+                },
                 Action::ClearAll => {
                     *cursor_position = 0;
                     input.clear();
@@ -227,25 +248,7 @@ pub fn do_handle(
                     }
                     Ok(())
                 }
-                Action::Other => match key.code {
-                    KeyCode::Char(c) => {
-                        if *cursor_position <= input.len() {
-                            input.insert(*cursor_position, c);
-                            *cursor_position += 1;
-                        }
-                        do_filter(filtered_lines, &all_lines, &input, selected);
-                        Ok(())
-                    }
-                    KeyCode::Backspace => {
-                        if *cursor_position > 0 {
-                            input.remove(*cursor_position - 1);
-                            *cursor_position -= 1;
-                        }
-                        do_filter(filtered_lines, &all_lines, &input, selected);
-                        Ok(())
-                    }
-                    _ => Ok(()),
-                },
+                Action::Other => Ok(()),
             }
         }
         _ => Ok(()),
