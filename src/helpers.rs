@@ -76,6 +76,20 @@ fn do_filter(
     }
 }
 
+enum Action {
+    MoveLeft,
+    MoveRight,
+    MoveUp,
+    MoveDown,
+    MoveEnd,
+    MoveBegin,
+    Exit,
+    Select,
+    ClearAll,
+    BackSpace,
+    Other,
+    Key(char)
+}
 
 pub fn do_handle(
     cursor_position: &mut usize,
@@ -86,21 +100,6 @@ pub fn do_handle(
 ) -> Result<(), Box<dyn std::error::Error>> {
     match event::read()? {
         Event::Key(key) => {
-            enum Action {
-                MoveLeft,
-                MoveRight,
-                MoveUp,
-                MoveDown,
-                MoveEnd,
-                MoveBegin,
-                Exit,
-                Select,
-                ClearAll,
-                BackSpace,
-                Other,
-                Key(char)
-            }
-
             let action = match key.code {
                 KeyCode::Backspace => Action::BackSpace,
                 KeyCode::Enter => Action::Select,
@@ -177,7 +176,6 @@ pub fn do_handle(
                         *cursor_position += 1;
                     }
                     do_filter(filtered_lines, &all_lines, &input, selected);
-                    Ok(())
 
                 },
                 Action::BackSpace => {
@@ -186,13 +184,11 @@ pub fn do_handle(
                         *cursor_position -= 1;
                     }
                     do_filter(filtered_lines, &all_lines, &input, selected);
-                    Ok(())
                 },
                 Action::ClearAll => {
                     *cursor_position = 0;
                     input.clear();
                     do_filter(filtered_lines, &all_lines, &input, selected);
-                    Ok(())
                 }
                 Action::Select => {
                     if let Some(sel) = selected {
@@ -203,7 +199,6 @@ pub fn do_handle(
                             std::process::exit(0);
                         }
                     }
-                    Ok(())
                 }
                 Action::Exit => {
                     disable_raw_mode()?;
@@ -212,23 +207,19 @@ pub fn do_handle(
                 }
                 Action::MoveBegin => {
                     *cursor_position = 0;
-                    Ok(())
                 }
                 Action::MoveEnd => {
                     *cursor_position = input.len();
-                    Ok(())
                 }
                 Action::MoveLeft => {
                     if *cursor_position > 0 {
                         *cursor_position -= 1;
                     }
-                    Ok(())
                 }
                 Action::MoveRight => {
                     if *cursor_position < input.len() {
                         *cursor_position += 1;
                     }
-                    Ok(())
                 }
                 Action::MoveUp => {
                     if let Some(new_selected) = selected {
@@ -237,7 +228,6 @@ pub fn do_handle(
                             *selected = Some(ns - 1);
                         }
                     }
-                    Ok(())
                 }
                 Action::MoveDown => {
                     if let Some(new_selected) = selected {
@@ -246,12 +236,12 @@ pub fn do_handle(
                             *selected = Some(ns + 1);
                         }
                     }
-                    Ok(())
                 }
-                Action::Other => Ok(()),
+                Action::Other => () 
             }
         }
-        _ => Ok(()),
+        _ => {},
     }
+    Ok(())
 }
 
