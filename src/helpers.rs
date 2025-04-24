@@ -22,7 +22,6 @@ fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
             if cc.to_ascii_lowercase() == current {
                 input_index += 1;
                 hits.push(counter);
-
                 if input_index >= input_length {
                     break;
                 }
