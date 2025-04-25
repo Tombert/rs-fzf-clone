@@ -6,7 +6,9 @@ use crossterm::execute;
 use crossterm::terminal::LeaveAlternateScreen;
 
 use rayon::prelude::*;
+use tokio::sync::RwLock;
 use std::io::{self};
+use std::sync::Arc;
 
 fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
     let mut input_index = 0;
@@ -52,13 +54,14 @@ fn get_delta(input: &Vec<usize>) -> usize {
     delta
 }
 
-fn do_filter(
+pub async fn do_filter(
     filtered_lines: &mut Vec<(String, Vec<usize>)>,
-    all_lines: &Vec<(String, Vec<usize>)>,
+    all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
     input: &String,
     selected: &mut Option<usize>,
 ) {
-    let mut filtered_lines2: Vec<(String, Vec<usize>)> = all_lines
+    let mut filtered_lines2: Vec<(String, Vec<usize>)> = 
+        all_lines.read().await
         .par_iter()
         .filter_map(|(line, _)| fuzzy_search(&input, line))
         .collect();
@@ -90,11 +93,11 @@ enum Action {
     Key(char)
 }
 
-pub fn do_handle(
+pub async fn do_handle(
     cursor_position: &mut usize,
     input: &mut String,
     filtered_lines: &mut Vec<(String, Vec<usize>)>,
-    all_lines: &Vec<(String, Vec<usize>)>,
+    all_lines: Arc<RwLock<Vec<(String, Vec<usize>)>>>,
     selected: &mut Option<usize>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match event::read()? {
@@ -174,7 +177,7 @@ pub fn do_handle(
                         input.insert(*cursor_position, c);
                         *cursor_position += 1;
                     }
-                    do_filter(filtered_lines, &all_lines, &input, selected);
+                    do_filter(filtered_lines, &all_lines.clone(), &input, selected).await;
 
                 },
                 Action::BackSpace => {
@@ -182,12 +185,12 @@ pub fn do_handle(
                         input.remove(*cursor_position - 1);
                         *cursor_position -= 1;
                     }
-                    do_filter(filtered_lines, &all_lines, &input, selected);
+                    do_filter(filtered_lines, &all_lines.clone(), &input, selected).await;
                 },
                 Action::ClearAll => {
                     *cursor_position = 0;
                     input.clear();
-                    do_filter(filtered_lines, &all_lines, &input, selected);
+                    do_filter(filtered_lines, &all_lines.clone(), &input, selected).await;
                 }
                 Action::Select => {
                     if let Some(sel) = selected {

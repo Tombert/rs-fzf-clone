@@ -3,6 +3,8 @@ use crossterm::terminal:: enable_raw_mode;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Modifier, Style};
+use tokio::io::{AsyncBufReadExt, BufReader, Stdin, AsyncReadExt, AsyncWriteExt};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 use crossterm::execute;
 use crossterm::terminal::EnterAlternateScreen;
@@ -14,7 +16,9 @@ use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
 mod helpers;
 
 use rayon::prelude::*;
+use tokio::sync::RwLock;
 use std::io::{self, BufRead};
+use std::sync::Arc;
 use std::time::Duration;
 
 fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
@@ -34,16 +38,32 @@ fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     ListItem::new(Text::from(vec![Line::from(spans)]))
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let stdin = io::stdin();
-    let all_lines: Vec<(String, Vec<usize>)> = stdin
-        .lock()
-        .lines()
-        .filter_map(Result::ok)
-        .map(|s| (s, Vec::new()))
-        .collect();
-    let total_len = all_lines.len();
-    let mut filtered_lines = all_lines.clone();
+fn stdin_reader(state: Arc<RwLock<Vec<(String, Vec<usize>)>>>, reader: BufReader<Stdin>) {
+    let mut lines = reader.lines();
+    tokio::spawn(async move {
+        while let Ok(Some(line)) = lines.next_line().await {
+            state.write().await.push((line, Vec::new())); 
+        }
+    });
+}
+
+
+
+#[tokio::main()]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let stdin = tokio::io::stdin(); // 
+    let reader = BufReader::new(stdin);
+    let all_lines = Arc::new(RwLock::new(Vec::new()));
+    stdin_reader(all_lines.clone(), reader);
+
+    //let stdin = io::stdin();
+    // let all_lines: Vec<(String, Vec<usize>)> = stdin
+    //     .lock()
+    //     .lines()
+    //     .filter_map(Result::ok)
+    //     .map(|s| (s, Vec::new()))
+    //     .collect();
+    let mut filtered_lines = all_lines.clone().read().await.clone();
     let mut selected = if !filtered_lines.is_empty() {
         Some(filtered_lines.len() - 1) // or just Some(0)
     } else {
@@ -61,6 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     terminal.clear()?;
     loop {
+        let total_len = all_lines.read().await.len();
         terminal.draw(|f| {
             let size = f.size();
             let chunks = Layout::default()
@@ -145,9 +166,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &mut cursor_position,
                 &mut input,
                 &mut filtered_lines,
-                &all_lines,
+                all_lines.clone(),
                 &mut selected,
-            );
+            ).await;
         }
     }
 }
