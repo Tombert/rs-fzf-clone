@@ -81,7 +81,10 @@ pub async fn do_filter(
     //     .collect();
 
     {
-        filtered_lines.write().await.par_sort_by_key(|(_, hits)| get_delta(hits));
+        let mut f = filtered_lines.write().await; 
+        f.par_sort_by_key(|(_, hits)| get_delta(hits));
+        f.reverse();
+        f.truncate(100);
     }
     // //filtered_lines2.reverse();
     //
