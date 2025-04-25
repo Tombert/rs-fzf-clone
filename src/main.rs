@@ -109,13 +109,13 @@ async fn render(
                     let actual_items_to_show = filtered_lines.blocking_read().len().min(list_height);
 
                     let padding_rows = list_height.saturating_sub(actual_items_to_show);
-
+//&my_vec[..my_vec.len().min(100)]
                     let (items_to_render, real_selected) = if filtered_lines.blocking_read().len() <= list_height {
                         // Not enough items to fill the view, so pad the top
                         let padded_items = (0..padding_rows)
                             .map(|_| ListItem::new(""))
                             .chain(
-                                filtered_lines.blocking_read()
+                                filtered_lines.blocking_read()[..filtered_lines.blocking_read().len().min(100)]
                                 .iter()
                                 .map(|(line, hits)| styled_line(line, hits)),
                             )
