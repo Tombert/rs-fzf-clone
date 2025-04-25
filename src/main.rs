@@ -17,7 +17,6 @@ use rayon::prelude::*;
 use std::io::{self, BufRead};
 use std::time::Duration;
 
-
 fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     let mut spans = Vec::with_capacity(line.len());
     for (i, c) in line.chars().enumerate() {
@@ -34,8 +33,6 @@ fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     }
     ListItem::new(Text::from(vec![Line::from(spans)]))
 }
-
-
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdin = io::stdin();
