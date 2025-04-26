@@ -177,7 +177,7 @@ async fn render(
             }); 
             //tokio::time::sleep(Duration::from_millis(8)).await;
 
-            tokio::time::sleep(Duration::from_millis(16)).await;
+            //tokio::time::sleep(Duration::from_millis(16)).await;
         }
     });
   tokio::time::sleep(Duration::from_secs(1000000)).await;
