@@ -297,7 +297,7 @@ fn handle_input(ui_out_chan : UnboundedSender<UIStuff>, process_chan : Unbounded
     });
 }
 
-#[tokio::main()]
+#[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdin = tokio::io::stdin(); // 
     let reader = BufReader::new(stdin);
