@@ -202,15 +202,12 @@ fn process_input(mut in_chan : UnboundedReceiver<Option<String>>, out_chan : Unb
             input = query.clone(); 
 
             if !query.is_empty() {
-                let  filtered_items : Vec<(String,Vec<usize>)> = 
+                let  indexed  = 
                     all_lines
                     .read()
                     .await
                     .par_iter()
                     .filter_map(|(line,_)| helpers::fuzzy_search(query.as_str(), line.as_str()))
-                    .collect();
-                let indexed = filtered_items
-                    .into_par_iter()
                     .fold(
                         HashMap::new,
                         |mut acc, (s, v)| {
