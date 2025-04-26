@@ -52,7 +52,7 @@ fn stdin_reader(state: Arc<RwLock<Vec<(String, Vec<usize>)>>>, reader: BufReader
     });
 }
 
-async fn render(
+fn render(
 
     all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
     mut terminal: Terminal<CrosstermBackend<Stderr>>,
@@ -60,9 +60,9 @@ async fn render(
     mut new_data_chan : Receiver<Vec<(String, Vec<usize>)>>,
     mut ui_chan : Receiver<UIStuff>) 
 {
-    let z = all_lines.clone(); 
     //let filtered_lines = filtered_lines.clone();
     //let input = input.clone() ;
+    let z = all_lines.clone(); 
     tokio::spawn(async move {
         let mut filtered_lines : Vec<(String, Vec<usize>)>= Vec::new(); 
         let mut ui_stuff = None; 
@@ -180,7 +180,6 @@ async fn render(
             //tokio::time::sleep(Duration::from_millis(16)).await;
         }
     });
-  tokio::time::sleep(Duration::from_secs(1000000)).await;
 
 }
 
@@ -211,11 +210,16 @@ fn process_input(mut in_chan : Receiver<String>, out_chan : Sender<Vec<(String, 
                 //     // read lock is super short-lived here, only held during this single access
                 // }
                 if r != String::new() {
-                    let mut x : Vec<(String,Vec<usize>)>= all_lines.read().await.par_iter().filter_map(|(line,_)| helpers::fuzzy_search(r.as_str(), line.as_str())).collect();
+                    let mut x : Vec<(String,Vec<usize>)> = 
+                        all_lines
+                        .read()
+                        .await
+                        .par_iter()
+                        .filter_map(|(line,_)| helpers::fuzzy_search(r.as_str(), line.as_str()))
+                        .collect();
                     x.sort_by_key(|(_,k)| helpers::get_delta(k));
                     x.reverse();
 
-                    //tokio::time::sleep(Duration::from_secs(2)).await;
                     let _ = out_chan.send(x).await;
                 } else {
                     let al = all_lines.read().await.clone(); 
@@ -336,11 +340,12 @@ fn handle_input(ui_out_chan : Sender<UIStuff>, process_chan : Sender<String> ) {
                 let end = now.duration_since(UNIX_EPOCH)
                     .expect("Time went backwards");
                 let _ = ui_out_chan.send(current_ui.clone()).await; 
-
                 let _ = process_chan.send(current_ui.input.clone()).await;
+
 
             }
         }
+        tokio::time::sleep(Duration::from_secs(100000)).await;
     });
 }
 
@@ -379,9 +384,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (input_send, input_recv) = tokio::sync::mpsc::channel::<String>(1);
     let (processed_send, processed_recv) = tokio::sync::mpsc::channel::<Vec<(String, Vec<usize>)>>(1);
     let _ = input_send.send(String::new()).await; 
-    process_input(input_recv, processed_send, &all_lines);
     handle_input(ui_send, input_send);
-    render(&all_lines, terminal, list_state, processed_recv, ui_recv).await;
+    process_input(input_recv, processed_send, &all_lines);
+    render(&all_lines, terminal, list_state, processed_recv, ui_recv);
+    tokio::time::sleep(Duration::from_secs(1000000)).await;
     Ok(())
     //render(&all_lines, &filtered_lines, terminal,  list_state).await;
     // loop {
