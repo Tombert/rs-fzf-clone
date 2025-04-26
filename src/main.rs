@@ -134,35 +134,6 @@ fn render(
                             input: "".to_string(),
                             enter: false,
                         });
-
-                        //let selected_display = ui.selected.unwrap_or(0) + 1; // 1-based indexing
-                        let label = format!("[ {}/{} ]", selected.unwrap_or(0), total_len);
-                        let label_width = label.len() as u16;
-                        let divider_fill = if chunks[1].width > label_width {
-                            "─".repeat((chunks[1].width - label_width - 1) as usize)
-                        } else {
-                            "".to_string()
-                        };
-
-                        let divider_line = Paragraph::new(Line::from(vec![
-                            Span::styled(label, Style::default().fg(Color::Gray)),
-                            Span::raw(" "),
-                            Span::styled(divider_fill, Style::default().fg(Color::DarkGray)),
-                        ]));
-                        f.render_widget(divider_line, chunks[1]);
-
-                        let input_para = Paragraph::new(Text::from(vec![Line::from(vec![
-                            Span::styled("> ", Style::default().fg(Color::Blue)),
-                            Span::raw(ui.clone().input),
-                        ])]))
-                        .block(Block::default().borders(Borders::NONE));
-                        f.render_widget(input_para, chunks[2]);
-                        f.set_cursor(chunks[2].x + 2 + ui.cursor_position as u16, chunks[2].y);
-
-                        let list_height = chunks[0].height as usize;
-                        let actual_items_to_show = filtered_lines.len().min(list_height);
-
-                        let padding_rows = list_height.saturating_sub(actual_items_to_show);
                         if let Some(m) = movement {
                             match m {
                                 Movement::Up => {
@@ -192,6 +163,35 @@ fn render(
 
                             }
                         }
+
+                        //let selected_display = ui.selected.unwrap_or(0) + 1; // 1-based indexing
+                        let label = format!("[ {}/{} ]", selected.unwrap_or(0), total_len);
+                        let label_width = label.len() as u16;
+                        let divider_fill = if chunks[1].width > label_width {
+                            "─".repeat((chunks[1].width - label_width - 1) as usize)
+                        } else {
+                            "".to_string()
+                        };
+
+                        let divider_line = Paragraph::new(Line::from(vec![
+                            Span::styled(label, Style::default().fg(Color::Gray)),
+                            Span::raw(" "),
+                            Span::styled(divider_fill, Style::default().fg(Color::DarkGray)),
+                        ]));
+                        f.render_widget(divider_line, chunks[1]);
+
+                        let input_para = Paragraph::new(Text::from(vec![Line::from(vec![
+                            Span::styled("> ", Style::default().fg(Color::Blue)),
+                            Span::raw(ui.clone().input),
+                        ])]))
+                        .block(Block::default().borders(Borders::NONE));
+                        f.render_widget(input_para, chunks[2]);
+                        f.set_cursor(chunks[2].x + 2 + ui.cursor_position as u16, chunks[2].y);
+
+                        let list_height = chunks[0].height as usize;
+                        let actual_items_to_show = filtered_lines.len().min(list_height);
+
+                        let padding_rows = list_height.saturating_sub(actual_items_to_show);
 
                         let (items_to_render, real_selected) =
                             if filtered_lines.len() <= list_height {
