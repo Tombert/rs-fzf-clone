@@ -6,7 +6,7 @@ use ratatui::style::{Modifier, Style};
 use tokio::io::{AsyncBufReadExt, BufReader,  Stdin};
 use crossterm::terminal::disable_raw_mode ;
 use crossterm::terminal::LeaveAlternateScreen;
-//use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 
 use crossterm::execute;
@@ -19,7 +19,8 @@ use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
 mod helpers;
 
 use rayon::prelude::*;
-use tokio::sync::mpsc::{Receiver, Sender};
+//use tokio::sync::watch::{Receiver, Sender};
+//use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use std::io::{self, BufRead, Stderr};
 use std::sync::Arc;
@@ -63,17 +64,28 @@ async fn render(
     //let filtered_lines = filtered_lines.clone();
     //let input = input.clone() ;
     tokio::spawn(async move {
-        let mut filtered_lines = Vec::new(); 
+        let mut filtered_lines : Vec<(String, Vec<usize>)>= Vec::new(); 
         let mut ui_stuff = None; 
         loop {
 
-            while let Ok(new_l) = new_data_chan.try_recv() {
-                filtered_lines = new_l;
-            }
 
-            while let Ok(ui_update) = ui_chan.try_recv() {
-                ui_stuff = Some(ui_update);
-            }
+
+            (filtered_lines, ui_stuff) = tokio::select! {
+                new_l = new_data_chan.recv() => {
+                    (new_l.unwrap(), ui_stuff)
+                }, 
+                ui_new = ui_chan.recv() =>{
+                    (filtered_lines, ui_new)
+                }
+
+            };
+            // while let Ok(new_l) = new_data_chan.try_recv() {
+            //     filtered_lines = new_l;
+            // }
+            //
+            // while let Ok(ui_update) = ui_chan.try_recv() {
+            //     ui_stuff = Some(ui_update);
+            // }
 
             let total_len = z.clone().read().await.len();
             tokio::task::block_in_place(|| {
@@ -165,13 +177,14 @@ async fn render(
             }); 
             //tokio::time::sleep(Duration::from_millis(8)).await;
 
+            tokio::time::sleep(Duration::from_millis(16)).await;
         }
     });
-  tokio::time::sleep(Duration::from_secs(100000)).await;
+  tokio::time::sleep(Duration::from_secs(1000000)).await;
 
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 struct UIStuff {
     input : String,
     cursor_position : usize,
@@ -197,11 +210,18 @@ fn process_input(mut in_chan : Receiver<String>, out_chan : Sender<Vec<(String, 
                 //     }
                 //     // read lock is super short-lived here, only held during this single access
                 // }
-                let mut x : Vec<(String,Vec<usize>)>= all_lines.read().await.par_iter().filter_map(|(line,_)| helpers::fuzzy_search(r.as_str(), line.as_str())).collect();
-                x.sort_by_key(|(_,k)| helpers::get_delta(k));
-                x.reverse();
+                if r != String::new() {
+                    let mut x : Vec<(String,Vec<usize>)>= all_lines.read().await.par_iter().filter_map(|(line,_)| helpers::fuzzy_search(r.as_str(), line.as_str())).collect();
+                    x.sort_by_key(|(_,k)| helpers::get_delta(k));
+                    x.reverse();
 
-                let _ = out_chan.send(x).await;
+                    //tokio::time::sleep(Duration::from_secs(2)).await;
+                    let _ = out_chan.send(x).await;
+                } else {
+                    let al = all_lines.read().await.clone(); 
+                    let _ = out_chan.send(al).await;
+
+                }
 
 
             } else {
@@ -215,13 +235,23 @@ fn process_input(mut in_chan : Receiver<String>, out_chan : Sender<Vec<(String, 
 
 fn handle_input(ui_out_chan : Sender<UIStuff>, process_chan : Sender<String> ) {
     tokio::spawn(async move {
-        let mut input = "".to_string(); 
-        let mut cursor_position = 0; 
+        //let mut input = "".to_string(); 
+        //let mut cursor_position = 0; 
         let mut selected : Option<usize> = None; 
+        //let mut last_input = String::new(); 
+        let mut last_ui = UIStuff {
+            input: String::new(), 
+            enter: false, 
+            cursor_position: 0, 
+            selected : None,
 
-        let now = SystemTime::now();
-        let mut start = now.duration_since(UNIX_EPOCH)
-            .expect("Time went backwards");
+        };
+
+        let mut current_ui = last_ui.clone(); 
+
+        //let now = SystemTime::now();
+        // let mut start = now.duration_since(UNIX_EPOCH)
+        //     .expect("Time went backwards");
         loop {
             if let Ok(_) = event::poll(Duration::from_millis(50)) { 
                 let res = match event::read() {
@@ -230,21 +260,21 @@ fn handle_input(ui_out_chan : Sender<UIStuff>, process_chan : Sender<String> ) {
                 };
                 match res {
                     helpers::Action::Key(c) => {
-                        if cursor_position <= input.len() {
-                            input.insert(cursor_position, c);
-                            cursor_position += 1; 
+                        if current_ui.cursor_position <= current_ui.input.len() {
+                            current_ui.input.insert(current_ui.cursor_position, c);
+                            current_ui.cursor_position += 1; 
                         }
 
                     },
                     helpers::Action::BackSpace => {
-                        if cursor_position > 0 {
-                            input.remove(cursor_position - 1);
-                            cursor_position -= 1; 
+                        if current_ui.cursor_position > 0 {
+                            current_ui.input.remove(current_ui.cursor_position - 1);
+                            current_ui.cursor_position -= 1; 
                         }
                     },
                     helpers::Action::ClearAll => {
-                        cursor_position = 0;
-                        input.clear();
+                        current_ui.cursor_position = 0;
+                        current_ui.input.clear();
                     }
                     helpers::Action::Select => {
                         ()
@@ -263,33 +293,33 @@ fn handle_input(ui_out_chan : Sender<UIStuff>, process_chan : Sender<String> ) {
                         std::process::exit(0);
                     }
                     helpers::Action::MoveBegin => {
-                        cursor_position = 0;
+                        current_ui.cursor_position = 0;
                     }
                     helpers::Action::MoveEnd => {
-                        cursor_position = input.len();
+                        current_ui.cursor_position = current_ui.input.len();
                     }
                     helpers::Action::MoveLeft => {
-                        if cursor_position > 0 {
-                            cursor_position -= 1;
+                        if current_ui.cursor_position > 0 {
+                            current_ui.cursor_position -= 1;
                         }
                     }
                     helpers::Action::MoveRight => {
-                        if cursor_position < input.len() {
-                            cursor_position += 1;
+                        if current_ui.cursor_position < current_ui.input.len() {
+                            current_ui.cursor_position += 1;
                         }
                     }
                     helpers::Action::MoveUp => {
-                        if let Some(new_selected) = selected {
+                        if let Some(new_selected) = current_ui.selected.clone() {
                             let ns = new_selected.clone();
                             if ns > 0 {
-                                selected = Some(ns - 1);
+                                current_ui.selected = Some(ns - 1);
                             }
                         }
                     }
                     helpers::Action::MoveDown => {
-                        if let Some(new_selected) = selected {
+                        if let Some(new_selected) = current_ui.selected.clone() {
                             let ns = new_selected.clone();
-                            selected = None;
+                            current_ui.selected = None;
                             // if ns + 1 < filtered_lines.read().await.len() {
                             //     *selected = Some(ns + 1);
                             // }
@@ -300,30 +330,14 @@ fn handle_input(ui_out_chan : Sender<UIStuff>, process_chan : Sender<String> ) {
 
             }
 
-            let now = SystemTime::now();
-            let end = now.duration_since(UNIX_EPOCH)
-                .expect("Time went backwards");
-            if end.saturating_sub(start) > Duration::from_millis(17) {
-
-                let o = UIStuff{
-                    input: input.clone(), 
-                    cursor_position : cursor_position.clone(),
-                    enter: false,
-                    selected : selected.clone()
-                };
-
-                 let _ = process_chan.send(input.clone()).await;
-                // if let Err(e) = process_chan.try_send(input.clone()) {
-                //     println!("process_chan full, skipping input: {:?}", e);
-                // } else {
-                //     println!("success");
-                //
-                // }
-
-                let _ = ui_out_chan.send(o).await; 
+            if current_ui != last_ui {
+                last_ui = current_ui.clone();
                 let now = SystemTime::now();
-                start = now.duration_since(UNIX_EPOCH)
+                let end = now.duration_since(UNIX_EPOCH)
                     .expect("Time went backwards");
+                let _ = ui_out_chan.send(current_ui.clone()).await; 
+
+                let _ = process_chan.send(current_ui.input.clone()).await;
 
             }
         }
@@ -358,12 +372,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     execute!(screen, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(screen);
     let mut terminal = Terminal::new(backend)?;
-    let cursor_position = Arc::new(RwLock::new(0));
+    //let cursor_position = Arc::new(RwLock::new(0));
 
     terminal.clear()?;
     let (ui_send, ui_recv) = tokio::sync::mpsc::channel::<UIStuff>(1);
     let (input_send, input_recv) = tokio::sync::mpsc::channel::<String>(1);
     let (processed_send, processed_recv) = tokio::sync::mpsc::channel::<Vec<(String, Vec<usize>)>>(1);
+    let _ = input_send.send(String::new()).await; 
     process_input(input_recv, processed_send, &all_lines);
     handle_input(ui_send, input_send);
     render(&all_lines, terminal, list_state, processed_recv, ui_recv).await;
