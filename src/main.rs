@@ -203,12 +203,14 @@ fn process_input(mut in_chan : UnboundedReceiver<String>, out_chan : UnboundedSe
                         .collect();
                     x.sort_by_key(|(_,k)| helpers::get_delta(k));
                     x.reverse();
+                    let x = x[..100.min(x.len())].to_vec();
 
                     let _ = out_chan.send(x);
                     tokio::task::yield_now().await;
                 } else {
                     //let mut al = Vec::new();
-                    let al = all_lines.read().await[..100].to_vec();
+                    let all_lines = all_lines.read().await; 
+                    let al = all_lines[..100.min(all_lines.len())].to_vec();
                     let _ = out_chan.send(al);
                     tokio::task::yield_now().await;
                 }
