@@ -81,11 +81,6 @@ fn render(
                 ui_new = ui_chan.recv() =>{
                     (filtered_lines, ui_new)
                 }
-                // z = source_ch.changed() => {
-                //     let zz = zzz.read().await;
-                //     (zz.clone(), ui_stuff)
-                //
-                // }
             };
 
             let total_len = z.clone().read().await.len();
@@ -196,6 +191,7 @@ fn process_input(
 ) {
     let all_lines = all_lines.clone();
     let mut input = "".to_string();
+    const BUFF_SIZE : usize = 20;
     tokio::spawn(async move {
         loop {
             let query = match in_chan.recv().await {
@@ -228,8 +224,9 @@ fn process_input(
                 for i in 0..50 {
                     let temp = Vec::new();
                     let current = indexed.get(&i).unwrap_or(&temp);
-                    buff.extend(current.to_vec());
-                    if buff.len() >= 5 {
+                    let slice = current[..BUFF_SIZE.min(current.len())].to_vec();
+                    buff.extend(slice);
+                    if buff.len() >= BUFF_SIZE {
                         break;
                     }
                 }
@@ -237,9 +234,8 @@ fn process_input(
                 let _ = out_chan.send(buff);
                 tokio::task::yield_now().await;
             } else {
-                //let mut al = Vec::new();
                 let all_lines = all_lines.read().await;
-                let al = all_lines[..100.min(all_lines.len())].to_vec();
+                let al = all_lines[..BUFF_SIZE.min(all_lines.len())].to_vec();
                 let _ = out_chan.send(al);
                 tokio::task::yield_now().await;
             }
