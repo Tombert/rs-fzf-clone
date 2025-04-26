@@ -6,8 +6,7 @@ use ratatui::style::{Modifier, Style};
 use tokio::io::{AsyncBufReadExt, BufReader,  Stdin};
 use crossterm::terminal::disable_raw_mode ;
 use crossterm::terminal::LeaveAlternateScreen;
-use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, UnboundedSender};
-use tokio::sync::oneshot;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crossterm::execute;
 use crossterm::terminal::EnterAlternateScreen;
@@ -19,12 +18,10 @@ use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
 mod helpers;
 
 use rayon::prelude::*;
-//use tokio::sync::watch::{Receiver, Sender};
-//use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
-use std::io::{self, BufRead, Stderr};
+use std::io::{self, Stderr};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     let mut spans = Vec::with_capacity(line.len());
