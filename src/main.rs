@@ -287,9 +287,11 @@ fn handle_input(ui_out_chan : UnboundedSender<UIStuff>, process_chan : Unbounded
             }
 
             if current_ui != last_ui {
-                last_ui = current_ui.clone();
-                let _ = process_chan.send(current_ui.input.clone());
+                if current_ui.input != last_ui.input {
+                    let _ = process_chan.send(current_ui.input.clone());
+                }
                 let _ = ui_out_chan.send(current_ui.clone()); 
+                last_ui = current_ui.clone();
                 tokio::task::yield_now().await;
 
             }
