@@ -57,8 +57,6 @@ fn render(
     mut new_data_chan : UnboundedReceiver<Vec<(String, Vec<usize>)>>,
     mut ui_chan : UnboundedReceiver<UIStuff>) 
 {
-    //let filtered_lines = filtered_lines.clone();
-    //let input = input.clone() ;
     let z = all_lines.clone(); 
     tokio::spawn(async move {
         let mut filtered_lines : Vec<(String, Vec<usize>)>= Vec::new(); 
@@ -129,9 +127,7 @@ fn render(
                     let actual_items_to_show = filtered_lines.len().min(list_height);
 
                     let padding_rows = list_height.saturating_sub(actual_items_to_show);
-//&my_vec[..my_vec.len().min(100)]
                     let (items_to_render, real_selected) = if filtered_lines.len() <= list_height {
-                        // Not enough items to fill the view, so pad the top
                         let padded_items = (0..padding_rows)
                             .map(|_| ListItem::new(""))
                             .chain(
@@ -144,7 +140,6 @@ fn render(
                         let real_selected = ui.selected.map(|sel| sel + padding_rows);
                         (padded_items, real_selected)
                     } else {
-                        // Too many items, so scroll normally from the top
                         let start_idx = filtered_lines.len() - list_height;
                         let items = filtered_lines
                             .par_iter()
@@ -165,12 +160,8 @@ fn render(
                     f.render_stateful_widget(list, chunks[0], &mut list_state);
                 }).unwrap();
             }); 
-            //tokio::time::sleep(Duration::from_millis(8)).await;
-
-            //tokio::time::sleep(Duration::from_millis(16)).await;
         }
     });
-
 }
 
 #[derive(Clone, Eq, PartialEq)]
@@ -222,7 +213,7 @@ fn handle_input(ui_out_chan : UnboundedSender<UIStuff>, process_chan : Unbounded
             input: String::new(), 
             enter: false, 
             cursor_position: 0, 
-            selected : None,
+            selected : Some(0),
 
         };
 
@@ -320,11 +311,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         *f = all_lines.clone().read().await.clone();
     }
     
-    let mut selected = if !filtered_lines.read().await.is_empty() {
-        Some(filtered_lines.read().await.len() - 1) // or just Some(0)
-    } else {
-        None
-    };
     let list_state = ListState::default();
 
     enable_raw_mode()?;
