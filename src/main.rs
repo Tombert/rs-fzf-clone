@@ -186,19 +186,22 @@ fn process_input(mut in_chan : Receiver<String>, out_chan : Sender<Vec<(String, 
     let all_lines = all_lines.clone(); 
     tokio::spawn(async move {
         loop {
-            let mut buff = Vec::new(); 
+            //let mut buff = Vec::new(); 
 
             if let Some(r) = in_chan.recv().await {
 
-                for (line,_) in all_lines.read().await.iter() {
-                    //println!("Testing {}", r); // never prints!
-                    if let Some(res) = helpers::fuzzy_search(r.as_str(), line.as_str()) {
-                        buff.push(res);
-                    }
-                    // read lock is super short-lived here, only held during this single access
-                }
+                // for (line,_) in all_lines.read().await.iter() {
+                //     //println!("Testing {}", r); // never prints!
+                //     if let Some(res) = helpers::fuzzy_search(r.as_str(), line.as_str()) {
+                //         buff.push(res);
+                //     }
+                //     // read lock is super short-lived here, only held during this single access
+                // }
+                let mut x : Vec<(String,Vec<usize>)>= all_lines.read().await.par_iter().filter_map(|(line,_)| helpers::fuzzy_search(r.as_str(), line.as_str())).collect();
+                x.sort_by_key(|(_,k)| helpers::get_delta(k));
+                x.reverse();
 
-                let _ = out_chan.send(buff).await;
+                let _ = out_chan.send(x).await;
 
 
             } else {

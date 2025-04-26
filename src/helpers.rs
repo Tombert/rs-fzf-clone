@@ -41,7 +41,7 @@ pub fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
     return Some((line.to_string(), hits));
 }
 
-fn get_delta(input: &Vec<usize>) -> usize {
+pub fn get_delta(input: &Vec<usize>) -> usize {
     let mut delta = 0;
     if input.len() > 1 {
         for i in input.windows(2) {
