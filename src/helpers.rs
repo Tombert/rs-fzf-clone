@@ -1,6 +1,5 @@
 use crossterm::event::{Event, KeyCode};
 
-
 pub fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
     let mut input_index = 0;
     let input_chars: Vec<char> = input.chars().collect();
@@ -45,9 +44,6 @@ pub fn get_delta(input: &Vec<usize>) -> usize {
     delta
 }
 
-
-
-
 pub enum Action {
     MoveLeft,
     MoveRight,
@@ -60,85 +56,79 @@ pub enum Action {
     ClearAll,
     BackSpace,
     Other,
-    Key(char)
+    Key(char),
 }
 
-
-pub fn parse_action(ev : Event) -> Action {
+pub fn parse_action(ev: Event) -> Action {
     match ev {
-        Event::Key(key) => {
-             match key.code {
-                KeyCode::Backspace => Action::BackSpace,
-                KeyCode::Enter => Action::Select,
-                KeyCode::Esc => Action::Exit,
-                KeyCode::Char('u')
-                    if key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                {
-                    Action::ClearAll
-                }
-                KeyCode::Char('c')
-                    if key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                {
-                    Action::Exit
-                }
-                KeyCode::Char('e')
-                    if key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                {
-                    Action::MoveEnd
-                }
-                KeyCode::Char('a')
-                    if key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                {
-                    Action::MoveBegin
-                }
-
-                KeyCode::Up => Action::MoveUp,
-                KeyCode::Char('p')
-                    if key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                {
-                    Action::MoveUp
-                }
-                KeyCode::Down => Action::MoveDown,
-                KeyCode::Char('n')
-                    if key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                {
-                    Action::MoveDown
-                }
-                KeyCode::Left => Action::MoveLeft,
-                KeyCode::Char('b')
-                    if key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                {
-                    Action::MoveLeft
-                }
-                KeyCode::Right => Action::MoveRight,
-                KeyCode::Char('f')
-                    if key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                {
-                    Action::MoveRight
-                }
-                KeyCode::Char(c) => Action::Key(c),
-                _ => Action::Other,
+        Event::Key(key) => match key.code {
+            KeyCode::Backspace => Action::BackSpace,
+            KeyCode::Enter => Action::Select,
+            KeyCode::Esc => Action::Exit,
+            KeyCode::Char('u')
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
+                Action::ClearAll
             }
+            KeyCode::Char('c')
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
+                Action::Exit
+            }
+            KeyCode::Char('e')
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
+                Action::MoveEnd
+            }
+            KeyCode::Char('a')
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
+                Action::MoveBegin
+            }
+
+            KeyCode::Up => Action::MoveUp,
+            KeyCode::Char('p')
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
+                Action::MoveUp
+            }
+            KeyCode::Down => Action::MoveDown,
+            KeyCode::Char('n')
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
+                Action::MoveDown
+            }
+            KeyCode::Left => Action::MoveLeft,
+            KeyCode::Char('b')
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
+                Action::MoveLeft
+            }
+            KeyCode::Right => Action::MoveRight,
+            KeyCode::Char('f')
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
+                Action::MoveRight
+            }
+            KeyCode::Char(c) => Action::Key(c),
+            _ => Action::Other,
         },
-        _=> Action::Other
+        _ => Action::Other,
     }
 }
-
-
-
