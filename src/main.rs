@@ -71,37 +71,42 @@ fn render(
     tokio::spawn(async move {
         let mut filtered_lines: Vec<(String, Vec<usize>)> = Vec::new();
         let mut ui_stuff = None;
-        let mut selected = Some(0); 
+        let mut selected = None; 
+        let def = if filtered_lines.len() > 0 {filtered_lines.len() - 1} else {0};
         loop {
-            (filtered_lines, ui_stuff) = tokio::select! {
+            let t = selected.unwrap_or(def);
+            let mut hit_enter = false; 
+            let mut movement = None; 
+            selected = Some(t);
+            (filtered_lines, ui_stuff, movement) = tokio::select! {
                 new_l = new_data_chan.recv() => {
-                    (new_l.unwrap_or(Vec::new()), ui_stuff)
+                    (new_l.unwrap_or(Vec::new()), ui_stuff, None)
                 },
                 ui_new = ui_chan.recv() =>{
-                    (filtered_lines, ui_new)
+                    (filtered_lines, ui_new, None)
                 },
                 m = movement_chan.recv() => {
-                    if let Some(m) = m {
-                        match m {
-                            Movement::Down => {
-                                let current_selected = selected.unwrap_or(0);
-                                let new_selected = current_selected + 1; 
-                                selected = Some(new_selected); 
-                            },
-                            Movement::Up => {
-                                let current_selected = selected.unwrap_or(0);
-                                if current_selected > 0 {
-                                    let new_selected = current_selected - 1; 
-                                    selected = Some(new_selected); 
-                                }
-                            },
-                            Movement::Enter => {
+                    // if let Some(m) = m {
+                    //     match m {
+                    //         Movement::Down => {
+                    //             let current_selected = selected.unwrap_or(0);
+                    //             let new_selected = current_selected + 1; 
+                    //             selected = Some(new_selected); 
+                    //         },
+                    //         Movement::Up => {
+                    //             let current_selected = selected.unwrap_or(0);
+                    //             if current_selected > 0 {
+                    //                 let new_selected = current_selected - 1; 
+                    //                 selected = Some(new_selected); 
+                    //             }
+                    //         },
+                    //         Movement::Enter => {
+                    //             hit_enter = true; 
+                    //         }
+                    //     }
+                    // }
 
-                            }
-                        }
-                    }
-
-                    (filtered_lines, ui_stuff)
+                    (filtered_lines, ui_stuff, m)
                 }
             };
 
@@ -169,8 +174,8 @@ fn render(
                                     )
                                     .collect::<Vec<_>>();
 
-                                // let real_selected = ui.selected.map(|sel| sel + padding_rows);
-                                (padded_items, selected)
+                                let real_selected = selected.map(|sel| sel + padding_rows);
+                                (padded_items, real_selected)
                             } else {
                                 let start_idx = filtered_lines.len() - list_height;
                                 let items = filtered_lines
@@ -180,9 +185,9 @@ fn render(
                                     .map(|(line, hits)| styled_line(line, hits))
                                     .collect::<Vec<_>>();
 
-                                // let real_selected =
-                                //     ui.selected.map(|sel| sel.saturating_sub(start_idx));
-                                (items, selected)
+                                let real_selected =
+                                    selected.map(|sel| sel.saturating_sub(start_idx));
+                                (items, real_selected)
                             };
 
                         let list = List::new(items_to_render)
@@ -190,6 +195,37 @@ fn render(
                             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
                         list_state.select(real_selected);
+
+                        if let Some(m) = movement {
+                            match m {
+                                Movement::Up => {
+                                    let current_selected = selected.unwrap_or(0);
+                                    if current_selected > 0 {
+                                        let new_selected = current_selected - 1; 
+                                        selected = Some(new_selected); 
+                                    }
+                                }, 
+                                Movement::Down => {
+                                    let current_selected = selected.unwrap_or(0);
+                                    let new_selected = current_selected + 1; 
+                                    selected = Some(new_selected); 
+                                },
+
+                                Movement::Enter => {
+                                    if let Some(sel) = selected {
+                                        if let Some(line) = filtered_lines.get(sel - 1) {
+                                            let _ = disable_raw_mode();
+                                            let _ = execute!(io::stderr(), LeaveAlternateScreen);
+                                            println!("{}", line.0);
+                                            std::process::exit(0);
+                                        }
+
+                                    }
+                                }
+
+                            }
+                        }
+
                         f.render_stateful_widget(list, chunks[0], &mut list_state);
                     })
                     .unwrap();
