@@ -23,7 +23,6 @@ use std::io::{self, Stderr};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tokio::sync::watch::{Receiver, Sender};
 
 fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     let mut spans = Vec::with_capacity(line.len());
@@ -66,13 +65,13 @@ fn render(
     mut list_state: ListState,
     mut new_data_chan: UnboundedReceiver<Vec<(String, Vec<usize>)>>,
     mut ui_chan: UnboundedReceiver<UIStuff>,
-    //mut source_ch : Receiver<Option<usize>>
+    mut movement_chan : UnboundedReceiver<Movement>
 ) {
     let z = all_lines.clone();
-    //let zzz = all_lines.clone();
     tokio::spawn(async move {
         let mut filtered_lines: Vec<(String, Vec<usize>)> = Vec::new();
         let mut ui_stuff = None;
+        let mut selected = Some(0); 
         loop {
             (filtered_lines, ui_stuff) = tokio::select! {
                 new_l = new_data_chan.recv() => {
@@ -80,8 +79,32 @@ fn render(
                 },
                 ui_new = ui_chan.recv() =>{
                     (filtered_lines, ui_new)
+                },
+                m = movement_chan.recv() => {
+                    if let Some(m) = m {
+                        match m {
+                            Movement::Down => {
+                                let current_selected = selected.unwrap_or(0);
+                                let new_selected = current_selected + 1; 
+                                selected = Some(new_selected); 
+                            },
+                            Movement::Up => {
+                                let current_selected = selected.unwrap_or(0);
+                                if current_selected > 0 {
+                                    let new_selected = current_selected - 1; 
+                                    selected = Some(new_selected); 
+                                }
+                            },
+                            Movement::Enter => {
+
+                            }
+                        }
+                    }
+
+                    (filtered_lines, ui_stuff)
                 }
             };
+
 
             let total_len = z.clone().read().await.len();
             tokio::task::block_in_place(|| {
@@ -104,12 +127,11 @@ fn render(
                         let ui = ui_stuff.clone().unwrap_or(UIStuff {
                             cursor_position: 0,
                             input: "".to_string(),
-                            selected: None,
                             enter: false,
                         });
 
-                        let selected_display = ui.selected.unwrap_or(0) + 1; // 1-based indexing
-                        let label = format!("[ {}/{} ]", selected_display, total_len);
+                        //let selected_display = ui.selected.unwrap_or(0) + 1; // 1-based indexing
+                        let label = format!("[ {}/{} ]", selected.unwrap_or(0), total_len);
                         let label_width = label.len() as u16;
                         let divider_fill = if chunks[1].width > label_width {
                             "─".repeat((chunks[1].width - label_width - 1) as usize)
@@ -147,8 +169,8 @@ fn render(
                                     )
                                     .collect::<Vec<_>>();
 
-                                let real_selected = ui.selected.map(|sel| sel + padding_rows);
-                                (padded_items, real_selected)
+                                // let real_selected = ui.selected.map(|sel| sel + padding_rows);
+                                (padded_items, selected)
                             } else {
                                 let start_idx = filtered_lines.len() - list_height;
                                 let items = filtered_lines
@@ -158,9 +180,9 @@ fn render(
                                     .map(|(line, hits)| styled_line(line, hits))
                                     .collect::<Vec<_>>();
 
-                                let real_selected =
-                                    ui.selected.map(|sel| sel.saturating_sub(start_idx));
-                                (items, real_selected)
+                                // let real_selected =
+                                //     ui.selected.map(|sel| sel.saturating_sub(start_idx));
+                                (items, selected)
                             };
 
                         let list = List::new(items_to_render)
@@ -180,7 +202,6 @@ fn render(
 struct UIStuff {
     input: String,
     cursor_position: usize,
-    selected: Option<usize>,
     enter: bool,
 }
 
@@ -191,7 +212,7 @@ fn process_input(
 ) {
     let all_lines = all_lines.clone();
     let mut input = "".to_string();
-    const BUFF_SIZE : usize = 20;
+    const BUFF_SIZE : usize = 40;
     tokio::spawn(async move {
         loop {
             let query = match in_chan.recv().await {
@@ -243,16 +264,22 @@ fn process_input(
     });
 }
 
+enum Movement {
+    Up,
+    Down,
+    Enter
+}
+
 fn handle_input(
     ui_out_chan: UnboundedSender<UIStuff>,
     process_chan: UnboundedSender<Option<String>>,
+    movement_chan: UnboundedSender<Movement>
 ) {
     tokio::spawn(async move {
         let mut last_ui = UIStuff {
             input: String::new(),
             enter: false,
             cursor_position: 0,
-            selected: Some(0),
         };
 
         let mut current_ui = last_ui.clone();
@@ -282,10 +309,12 @@ fn handle_input(
                         current_ui.cursor_position = 0;
                         current_ui.input.clear();
                     }
-                    helpers::Action::Select => (),
+                    helpers::Action::Select => {
+                        movement_chan.send(Movement::Enter); 
+                    },
                     helpers::Action::Exit => {
-                        disable_raw_mode();
-                        execute!(io::stderr(), LeaveAlternateScreen);
+                        let _ = disable_raw_mode();
+                        let _ = execute!(io::stderr(), LeaveAlternateScreen);
                         std::process::exit(0);
                     }
                     helpers::Action::MoveBegin => {
@@ -305,18 +334,22 @@ fn handle_input(
                         }
                     }
                     helpers::Action::MoveUp => {
-                        if let Some(new_selected) = current_ui.selected.clone() {
-                            let ns = new_selected.clone();
-                            if ns > 0 {
-                                current_ui.selected = Some(ns - 1);
-                            }
-                        }
+                        
+                        movement_chan.send(Movement::Up);
+
+                        // if let Some(new_selected) = current_ui.selected.clone() {
+                        //     let ns = new_selected.clone();
+                        //     if ns > 0 {
+                        //         current_ui.selected = Some(ns - 1);
+                        //     }
+                        // }
                     }
                     helpers::Action::MoveDown => {
-                        if let Some(new_selected) = current_ui.selected.clone() {
-                            let ns = new_selected.clone();
-                            current_ui.selected = None;
-                        }
+                        movement_chan.send(Movement::Down);
+                        // if let Some(new_selected) = current_ui.selected.clone() {
+                        //     let ns = new_selected.clone();
+                        //     current_ui.selected = None;
+                        // }
                     }
                     helpers::Action::Other => (),
                 }
@@ -334,8 +367,8 @@ fn handle_input(
                 }
                 let _ = ui_out_chan.send(current_ui.clone());
                 last_ui = current_ui.clone();
-                tokio::task::yield_now().await;
             }
+            tokio::task::yield_now().await;
         }
     });
 }
@@ -350,6 +383,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (input_send, input_recv) = tokio::sync::mpsc::unbounded_channel::<Option<String>>();
     let (processed_send, processed_recv) =
         tokio::sync::mpsc::unbounded_channel::<Vec<(String, Vec<usize>)>>();
+    let (movement_send, movement_recv) =
+        tokio::sync::mpsc::unbounded_channel::<Movement>();
     //let (source_send, source_recv) = tokio::sync::watch::channel::<Option<usize>>(None);
 
     stdin_reader(all_lines.clone(), reader, input_send.clone());
@@ -369,9 +404,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     terminal.clear()?;
     let _ = input_send.send(None);
-    handle_input(ui_send, input_send);
+    handle_input(ui_send, input_send, movement_send);
     process_input(input_recv, processed_send, &all_lines);
-    render(&all_lines, terminal, list_state, processed_recv, ui_recv);
+    render(&all_lines, terminal, list_state, processed_recv, ui_recv, movement_recv);
     futures::future::pending::<()>().await;
     Ok(())
 }
