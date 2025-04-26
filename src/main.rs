@@ -191,18 +191,8 @@ fn process_input(mut in_chan : UnboundedReceiver<String>, out_chan : UnboundedSe
     let all_lines = all_lines.clone(); 
     tokio::spawn(async move {
         loop {
-            //let mut buff = Vec::new(); 
-            //println!("R: {}", r);
-
             if let Some(r) = in_chan.recv().await {
 
-                // for (line,_) in all_lines.read().await.iter() {
-                //     //println!("Testing {}", r); // never prints!
-                //     if let Some(res) = helpers::fuzzy_search(r.as_str(), line.as_str()) {
-                //         buff.push(res);
-                //     }
-                //     // read lock is super short-lived here, only held during this single access
-                // }
                 if r != String::new() {
                     let mut x : Vec<(String,Vec<usize>)> = 
                         all_lines
@@ -220,11 +210,8 @@ fn process_input(mut in_chan : UnboundedReceiver<String>, out_chan : UnboundedSe
                     let al = all_lines.read().await.clone(); 
                     let _ = out_chan.send(al);
                     tokio::task::yield_now().await;
-
                 }
-
             }
-
         }
     });
 }
@@ -333,21 +320,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         *f = all_lines.clone().read().await.clone();
     }
     
-    //let mut filtered_lines = all_lines.clone().read().await.clone();
     let mut selected = if !filtered_lines.read().await.is_empty() {
         Some(filtered_lines.read().await.len() - 1) // or just Some(0)
     } else {
         None
     };
     let list_state = ListState::default();
-    let input = Arc::new(RwLock::new(String::new()));
 
     enable_raw_mode()?;
     let mut screen = io::stderr();
     execute!(screen, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(screen);
     let mut terminal = Terminal::new(backend)?;
-    //let cursor_position = Arc::new(RwLock::new(0));
 
     terminal.clear()?;
     let (ui_send, ui_recv) = tokio::sync::mpsc::unbounded_channel::<UIStuff>();
@@ -357,6 +341,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     handle_input(ui_send, input_send);
     process_input(input_recv, processed_send, &all_lines);
     render(&all_lines, terminal, list_state, processed_recv, ui_recv);
-    tokio::time::sleep(Duration::from_secs(1000000)).await;
+    futures::future::pending::<()>().await;
     Ok(())
 }
