@@ -4,7 +4,10 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Modifier, Style};
 use tokio::io::{AsyncBufReadExt, BufReader,  Stdin};
+use crossterm::terminal::disable_raw_mode ;
+use crossterm::terminal::LeaveAlternateScreen;
 //use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::oneshot;
 
 use crossterm::execute;
 use crossterm::terminal::EnterAlternateScreen;
@@ -16,10 +19,11 @@ use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
 mod helpers;
 
 use rayon::prelude::*;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use std::io::{self, BufRead, Stderr};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     let mut spans = Vec::with_capacity(line.len());
@@ -50,22 +54,29 @@ fn stdin_reader(state: Arc<RwLock<Vec<(String, Vec<usize>)>>>, reader: BufReader
 async fn render(
 
     all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
-    filtered_lines: &Arc<RwLock< Vec<(String, Vec<usize>)>>>,
     mut terminal: Terminal<CrosstermBackend<Stderr>>,
-    selected: Option<usize>,
-    input: Arc<RwLock<String>>,
-    cursor_position : Arc<RwLock<usize>>,
-    mut list_state : ListState
-    ) 
+    mut list_state : ListState,
+    mut new_data_chan : Receiver<Vec<(String, Vec<usize>)>>,
+    mut ui_chan : Receiver<UIStuff>) 
 {
     let z = all_lines.clone(); 
-    let filtered_lines = filtered_lines.clone();
-    let input = input.clone() ;
+    //let filtered_lines = filtered_lines.clone();
+    //let input = input.clone() ;
     tokio::spawn(async move {
+        let mut filtered_lines = Vec::new(); 
+        let mut ui_stuff = None; 
         loop {
+
+            while let Ok(new_l) = new_data_chan.try_recv() {
+                filtered_lines = new_l;
+            }
+
+            while let Ok(ui_update) = ui_chan.try_recv() {
+                ui_stuff = Some(ui_update);
+            }
+
             let total_len = z.clone().read().await.len();
             tokio::task::block_in_place(|| {
-                let input = input.blocking_read(); 
                 terminal.draw(|f| {
                     let size = f.size();
                     let chunks = Layout::default()
@@ -81,7 +92,14 @@ async fn render(
                         )
                         .split(size);
 
-                    let selected_display = selected.unwrap_or(0) + 1; // 1-based indexing
+                    let ui = ui_stuff.clone().unwrap_or(UIStuff {
+                        cursor_position: 0, 
+                        input: "".to_string(),
+                        selected: None,
+                        enter : false
+                    });
+
+                    let selected_display = ui.selected.unwrap_or(0) + 1; // 1-based indexing
                     let label = format!("[ {}/{} ]", selected_display, total_len);
                     let label_width = label.len() as u16;
                     let divider_fill = if chunks[1].width > label_width {
@@ -99,41 +117,41 @@ async fn render(
 
                     let input_para = Paragraph::new(Text::from(vec![Line::from(vec![
                                 Span::styled("> ", Style::default().fg(Color::Blue)),
-                                Span::raw(input.clone()),
+                                Span::raw(ui.clone().input),
                     ])]))
                         .block(Block::default().borders(Borders::NONE));
                     f.render_widget(input_para, chunks[2]);
-                    f.set_cursor(chunks[2].x + 2 + *cursor_position.blocking_read() as u16, chunks[2].y);
+                    f.set_cursor(chunks[2].x + 2 + ui.cursor_position as u16, chunks[2].y);
 
                     let list_height = chunks[0].height as usize;
-                    let actual_items_to_show = filtered_lines.blocking_read().len().min(list_height);
+                    let actual_items_to_show = filtered_lines.len().min(list_height);
 
                     let padding_rows = list_height.saturating_sub(actual_items_to_show);
 //&my_vec[..my_vec.len().min(100)]
-                    let (items_to_render, real_selected) = if filtered_lines.blocking_read().len() <= list_height {
+                    let (items_to_render, real_selected) = if filtered_lines.len() <= list_height {
                         // Not enough items to fill the view, so pad the top
                         let padded_items = (0..padding_rows)
                             .map(|_| ListItem::new(""))
                             .chain(
-                                filtered_lines.blocking_read()[..filtered_lines.blocking_read().len().min(100)]
+                                filtered_lines[..filtered_lines.len().min(100)]
                                 .iter()
                                 .map(|(line, hits)| styled_line(line, hits)),
                             )
                             .collect::<Vec<_>>();
 
-                        let real_selected = selected.map(|sel| sel + padding_rows);
+                        let real_selected = ui.selected.map(|sel| sel + padding_rows);
                         (padded_items, real_selected)
                     } else {
                         // Too many items, so scroll normally from the top
-                        let start_idx = filtered_lines.blocking_read().len() - list_height;
-                        let items = filtered_lines.blocking_read()
+                        let start_idx = filtered_lines.len() - list_height;
+                        let items = filtered_lines
                             .par_iter()
                             .skip(start_idx)
                             .take(list_height)
                             .map(|(line, hits)| styled_line(line, hits))
                             .collect::<Vec<_>>();
 
-                        let real_selected = selected.map(|sel| sel.saturating_sub(start_idx));
+                        let real_selected = ui.selected.map(|sel| sel.saturating_sub(start_idx));
                         (items, real_selected)
                     };
 
@@ -145,13 +163,169 @@ async fn render(
                     f.render_stateful_widget(list, chunks[0], &mut list_state);
                 }).unwrap();
             }); 
-            tokio::time::sleep(Duration::from_millis(17)).await;
+            //tokio::time::sleep(Duration::from_millis(8)).await;
+
         }
     });
+  tokio::time::sleep(Duration::from_secs(100000)).await;
 
 }
 
+#[derive(Clone)]
+struct UIStuff {
+    input : String,
+    cursor_position : usize,
+    selected: Option<usize>,
+    enter: bool, 
+}
 
+fn process_input(mut in_chan : Receiver<String>, out_chan : Sender<Vec<(String, Vec<usize>)>>,
+    all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
+    ) {
+
+    let all_lines = all_lines.clone(); 
+    tokio::spawn(async move {
+        loop {
+            let mut buff = Vec::new(); 
+
+            if let Some(r) = in_chan.recv().await {
+
+                for (line,_) in all_lines.read().await.iter() {
+                    //println!("Testing {}", r); // never prints!
+                    if let Some(res) = helpers::fuzzy_search(r.as_str(), line.as_str()) {
+                        buff.push(res);
+                    }
+                    // read lock is super short-lived here, only held during this single access
+                }
+
+                let _ = out_chan.send(buff).await;
+
+
+            } else {
+
+            }
+
+
+        }
+    });
+}
+
+fn handle_input(ui_out_chan : Sender<UIStuff>, process_chan : Sender<String> ) {
+    tokio::spawn(async move {
+        let mut input = "".to_string(); 
+        let mut cursor_position = 0; 
+        let mut selected : Option<usize> = None; 
+
+        let now = SystemTime::now();
+        let mut start = now.duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+        loop {
+            if let Ok(_) = event::poll(Duration::from_millis(50)) { 
+                let res = match event::read() {
+                    Ok(e) => helpers::parse_action(e),
+                    _ => helpers::Action::Other
+                };
+                match res {
+                    helpers::Action::Key(c) => {
+                        if cursor_position <= input.len() {
+                            input.insert(cursor_position, c);
+                            cursor_position += 1; 
+                        }
+
+                    },
+                    helpers::Action::BackSpace => {
+                        if cursor_position > 0 {
+                            input.remove(cursor_position - 1);
+                            cursor_position -= 1; 
+                        }
+                    },
+                    helpers::Action::ClearAll => {
+                        cursor_position = 0;
+                        input.clear();
+                    }
+                    helpers::Action::Select => {
+                        ()
+                            // if let Some(sel) = selected {
+                            //     if let Some(line) = filtered_lines.read().await.get(*sel) {
+                            //         disable_raw_mode()?;
+                            //         execute!(io::stderr(), LeaveAlternateScreen)?;
+                            //         println!("{}", line.0);
+                            //         std::process::exit(0);
+                            //     }
+                            // }
+                    }
+                    helpers::Action::Exit => {
+                        disable_raw_mode();
+                        execute!(io::stderr(), LeaveAlternateScreen);
+                        std::process::exit(0);
+                    }
+                    helpers::Action::MoveBegin => {
+                        cursor_position = 0;
+                    }
+                    helpers::Action::MoveEnd => {
+                        cursor_position = input.len();
+                    }
+                    helpers::Action::MoveLeft => {
+                        if cursor_position > 0 {
+                            cursor_position -= 1;
+                        }
+                    }
+                    helpers::Action::MoveRight => {
+                        if cursor_position < input.len() {
+                            cursor_position += 1;
+                        }
+                    }
+                    helpers::Action::MoveUp => {
+                        if let Some(new_selected) = selected {
+                            let ns = new_selected.clone();
+                            if ns > 0 {
+                                selected = Some(ns - 1);
+                            }
+                        }
+                    }
+                    helpers::Action::MoveDown => {
+                        if let Some(new_selected) = selected {
+                            let ns = new_selected.clone();
+                            selected = None;
+                            // if ns + 1 < filtered_lines.read().await.len() {
+                            //     *selected = Some(ns + 1);
+                            // }
+                        }
+                    }
+                    helpers::Action::Other => () 
+                }
+
+            }
+
+            let now = SystemTime::now();
+            let end = now.duration_since(UNIX_EPOCH)
+                .expect("Time went backwards");
+            if end.saturating_sub(start) > Duration::from_millis(17) {
+
+                let o = UIStuff{
+                    input: input.clone(), 
+                    cursor_position : cursor_position.clone(),
+                    enter: false,
+                    selected : selected.clone()
+                };
+
+                 let _ = process_chan.send(input.clone()).await;
+                // if let Err(e) = process_chan.try_send(input.clone()) {
+                //     println!("process_chan full, skipping input: {:?}", e);
+                // } else {
+                //     println!("success");
+                //
+                // }
+
+                let _ = ui_out_chan.send(o).await; 
+                let now = SystemTime::now();
+                start = now.duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards");
+
+            }
+        }
+    });
+}
 
 #[tokio::main()]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -159,18 +333,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let reader = BufReader::new(stdin);
     let all_lines = Arc::new(RwLock::new(Vec::new()));
     let filtered_lines = Arc::new(RwLock::new(Vec::new()));
+
     stdin_reader(all_lines.clone(), reader);
 
-    //let stdin = io::stdin();
-    // let all_lines: Vec<(String, Vec<usize>)> = stdin
-    //     .lock()
-    //     .lines()
-    //     .filter_map(Result::ok)
-    //     .map(|s| (s, Vec::new()))
-    //     .collect();
     {
-    let mut f = filtered_lines.write().await; 
-    *f = all_lines.clone().read().await.clone();
+        let mut f = filtered_lines.write().await; 
+        *f = all_lines.clone().read().await.clone();
     }
     
     //let mut filtered_lines = all_lines.clone().read().await.clone();
@@ -190,17 +358,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cursor_position = Arc::new(RwLock::new(0));
 
     terminal.clear()?;
-    render(&all_lines, &filtered_lines, terminal, selected, input.clone(), cursor_position.clone(), list_state).await;
-    loop {
-
-        if event::poll(Duration::from_millis(100))? {
-            let _ = helpers::do_handle(
-                cursor_position.clone(),
-                input.clone(),
-                filtered_lines.clone(),
-                all_lines.clone(),
-                &mut selected,
-            ).await;
-        }
-    }
+    let (ui_send, ui_recv) = tokio::sync::mpsc::channel::<UIStuff>(1);
+    let (input_send, input_recv) = tokio::sync::mpsc::channel::<String>(1);
+    let (processed_send, processed_recv) = tokio::sync::mpsc::channel::<Vec<(String, Vec<usize>)>>(1);
+    process_input(input_recv, processed_send, &all_lines);
+    handle_input(ui_send, input_send);
+    render(&all_lines, terminal, list_state, processed_recv, ui_recv).await;
+    Ok(())
+    //render(&all_lines, &filtered_lines, terminal,  list_state).await;
+    // loop {
+    //
+    //     if event::poll(Duration::from_millis(100))? {
+    //         let _ = helpers::do_handle(
+    //             cursor_position.clone(),
+    //             input.clone(),
+    //             filtered_lines.clone(),
+    //             all_lines.clone(),
+    //             &mut selected,
+    //         ).await;
+    //     }
+    // }
 }

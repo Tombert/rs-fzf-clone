@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 use std::io::{self};
 use std::sync::Arc;
 
-fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
+pub fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
     let mut input_index = 0;
     let input_chars: Vec<char> = input.chars().collect();
     let input_length = input.len();
@@ -54,6 +54,8 @@ fn get_delta(input: &Vec<usize>) -> usize {
     delta
 }
 
+
+
 pub async fn do_filter(
     filtered_lines: &Arc<RwLock< Vec<(String, Vec<usize>)>>>,
     all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
@@ -74,21 +76,12 @@ pub async fn do_filter(
 
 
     }
-    // let mut filtered_lines2: Vec<(String, Vec<usize>)> = 
-    //     all_lines.read().await
-    //     .par_iter()
-    //     .filter_map(|(line, _)| fuzzy_search(&input, line))
-    //     .collect();
 
     {
         let mut f = filtered_lines.write().await; 
         f.par_sort_by_key(|(_, hits)| get_delta(hits));
         f.reverse();
-        f.truncate(100);
     }
-    // //filtered_lines2.reverse();
-    //
-    // *filtered_lines = filtered_lines2;
 
     if !filtered_lines.read().await.is_empty() {
         *selected = Some(filtered_lines.read().await.len() - 1);
@@ -98,14 +91,9 @@ pub async fn do_filter(
 
     }
 
-    // if !filtered_lines.is_empty() {
-    //     *selected = Some(filtered_lines.len() - 1);
-    // } else {
-    //     *selected = None;
-    // }
 }
 
-enum Action {
+pub enum Action {
     MoveLeft,
     MoveRight,
     MoveUp,
@@ -119,6 +107,84 @@ enum Action {
     Other,
     Key(char)
 }
+
+
+pub fn parse_action(ev : Event) -> Action {
+    match ev {
+        Event::Key(key) => {
+             match key.code {
+                KeyCode::Backspace => Action::BackSpace,
+                KeyCode::Enter => Action::Select,
+                KeyCode::Esc => Action::Exit,
+                KeyCode::Char('u')
+                    if key
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::ClearAll
+                }
+                KeyCode::Char('c')
+                    if key
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::Exit
+                }
+                KeyCode::Char('e')
+                    if key
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveEnd
+                }
+                KeyCode::Char('a')
+                    if key
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveBegin
+                }
+
+                KeyCode::Up => Action::MoveUp,
+                KeyCode::Char('p')
+                    if key
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveUp
+                }
+                KeyCode::Down => Action::MoveDown,
+                KeyCode::Char('n')
+                    if key
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveDown
+                }
+                KeyCode::Left => Action::MoveLeft,
+                KeyCode::Char('b')
+                    if key
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveLeft
+                }
+                KeyCode::Right => Action::MoveRight,
+                KeyCode::Char('f')
+                    if key
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
+                    Action::MoveRight
+                }
+                KeyCode::Char(c) => Action::Key(c),
+                _ => Action::Other,
+            }
+        },
+        _=> Action::Other
+    }
+}
+
 
 pub async fn do_handle(
     cursor_position: Arc<RwLock<usize>>,
