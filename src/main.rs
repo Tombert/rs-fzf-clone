@@ -207,7 +207,8 @@ fn process_input(mut in_chan : UnboundedReceiver<String>, out_chan : UnboundedSe
                     let _ = out_chan.send(x);
                     tokio::task::yield_now().await;
                 } else {
-                    let al = all_lines.read().await.clone(); 
+                    //let mut al = Vec::new();
+                    let al = all_lines.read().await[..100].to_vec();
                     let _ = out_chan.send(al);
                     tokio::task::yield_now().await;
                 }
