@@ -163,6 +163,36 @@ fn render(
                         let actual_items_to_show = filtered_lines.len().min(list_height);
 
                         let padding_rows = list_height.saturating_sub(actual_items_to_show);
+                        if let Some(m) = movement {
+                            match m {
+                                Movement::Up => {
+                                    let current_selected = selected.unwrap_or(0);
+                                    if current_selected > 0 {
+                                        let new_selected = current_selected - 1; 
+                                        selected = Some(new_selected); 
+                                    }
+                                }, 
+                                Movement::Down => {
+                                    let current_selected = selected.unwrap_or(0);
+                                    let new_selected = current_selected + 1; 
+                                    selected = Some(new_selected); 
+                                },
+
+                                Movement::Enter => {
+                                    if let Some(sel) = selected {
+                                        if let Some(line) = filtered_lines.get(sel) {
+                                            let _ = disable_raw_mode();
+                                            let _ = execute!(io::stderr(), LeaveAlternateScreen);
+                                            println!("{}", line.0);
+                                            std::process::exit(0);
+                                        }
+
+                                    }
+                                }
+
+                            }
+                        }
+
                         let (items_to_render, real_selected) =
                             if filtered_lines.len() <= list_height {
                                 let padded_items = (0..padding_rows)
@@ -196,35 +226,6 @@ fn render(
 
                         list_state.select(real_selected);
 
-                        if let Some(m) = movement {
-                            match m {
-                                Movement::Up => {
-                                    let current_selected = selected.unwrap_or(0);
-                                    if current_selected > 0 {
-                                        let new_selected = current_selected - 1; 
-                                        selected = Some(new_selected); 
-                                    }
-                                }, 
-                                Movement::Down => {
-                                    let current_selected = selected.unwrap_or(0);
-                                    let new_selected = current_selected + 1; 
-                                    selected = Some(new_selected); 
-                                },
-
-                                Movement::Enter => {
-                                    if let Some(sel) = selected {
-                                        if let Some(line) = filtered_lines.get(sel - 1) {
-                                            let _ = disable_raw_mode();
-                                            let _ = execute!(io::stderr(), LeaveAlternateScreen);
-                                            println!("{}", line.0);
-                                            std::process::exit(0);
-                                        }
-
-                                    }
-                                }
-
-                            }
-                        }
 
                         f.render_stateful_widget(list, chunks[0], &mut list_state);
                     })
