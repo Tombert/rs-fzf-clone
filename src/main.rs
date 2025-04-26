@@ -6,7 +6,7 @@ use ratatui::style::{Modifier, Style};
 use tokio::io::{AsyncBufReadExt, BufReader,  Stdin};
 use crossterm::terminal::disable_raw_mode ;
 use crossterm::terminal::LeaveAlternateScreen;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 
 use crossterm::execute;
@@ -57,8 +57,8 @@ fn render(
     all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
     mut terminal: Terminal<CrosstermBackend<Stderr>>,
     mut list_state : ListState,
-    mut new_data_chan : Receiver<Vec<(String, Vec<usize>)>>,
-    mut ui_chan : Receiver<UIStuff>) 
+    mut new_data_chan : UnboundedReceiver<Vec<(String, Vec<usize>)>>,
+    mut ui_chan : UnboundedReceiver<UIStuff>) 
 {
     //let filtered_lines = filtered_lines.clone();
     //let input = input.clone() ;
@@ -72,20 +72,13 @@ fn render(
 
             (filtered_lines, ui_stuff) = tokio::select! {
                 new_l = new_data_chan.recv() => {
-                    (new_l.unwrap(), ui_stuff)
+                    (new_l.unwrap_or(Vec::new()), ui_stuff)
                 }, 
                 ui_new = ui_chan.recv() =>{
                     (filtered_lines, ui_new)
                 }
 
             };
-            // while let Ok(new_l) = new_data_chan.try_recv() {
-            //     filtered_lines = new_l;
-            // }
-            //
-            // while let Ok(ui_update) = ui_chan.try_recv() {
-            //     ui_stuff = Some(ui_update);
-            // }
 
             let total_len = z.clone().read().await.len();
             tokio::task::block_in_place(|| {
@@ -191,7 +184,7 @@ struct UIStuff {
     enter: bool, 
 }
 
-fn process_input(mut in_chan : Receiver<String>, out_chan : Sender<Vec<(String, Vec<usize>)>>,
+fn process_input(mut in_chan : UnboundedReceiver<String>, out_chan : UnboundedSender<Vec<(String, Vec<usize>)>>,
     all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
     ) {
 
@@ -199,6 +192,7 @@ fn process_input(mut in_chan : Receiver<String>, out_chan : Sender<Vec<(String, 
     tokio::spawn(async move {
         loop {
             //let mut buff = Vec::new(); 
+            //println!("R: {}", r);
 
             if let Some(r) = in_chan.recv().await {
 
@@ -220,29 +214,23 @@ fn process_input(mut in_chan : Receiver<String>, out_chan : Sender<Vec<(String, 
                     x.sort_by_key(|(_,k)| helpers::get_delta(k));
                     x.reverse();
 
-                    let _ = out_chan.send(x).await;
+                    let _ = out_chan.send(x);
+                    tokio::task::yield_now().await;
                 } else {
                     let al = all_lines.read().await.clone(); 
-                    let _ = out_chan.send(al).await;
+                    let _ = out_chan.send(al);
+                    tokio::task::yield_now().await;
 
                 }
 
-
-            } else {
-
             }
-
 
         }
     });
 }
 
-fn handle_input(ui_out_chan : Sender<UIStuff>, process_chan : Sender<String> ) {
+fn handle_input(ui_out_chan : UnboundedSender<UIStuff>, process_chan : UnboundedSender<String> ) {
     tokio::spawn(async move {
-        //let mut input = "".to_string(); 
-        //let mut cursor_position = 0; 
-        let mut selected : Option<usize> = None; 
-        //let mut last_input = String::new(); 
         let mut last_ui = UIStuff {
             input: String::new(), 
             enter: false, 
@@ -253,9 +241,6 @@ fn handle_input(ui_out_chan : Sender<UIStuff>, process_chan : Sender<String> ) {
 
         let mut current_ui = last_ui.clone(); 
 
-        //let now = SystemTime::now();
-        // let mut start = now.duration_since(UNIX_EPOCH)
-        //     .expect("Time went backwards");
         loop {
             if let Ok(_) = event::poll(Duration::from_millis(50)) { 
                 let res = match event::read() {
@@ -282,14 +267,6 @@ fn handle_input(ui_out_chan : Sender<UIStuff>, process_chan : Sender<String> ) {
                     }
                     helpers::Action::Select => {
                         ()
-                            // if let Some(sel) = selected {
-                            //     if let Some(line) = filtered_lines.read().await.get(*sel) {
-                            //         disable_raw_mode()?;
-                            //         execute!(io::stderr(), LeaveAlternateScreen)?;
-                            //         println!("{}", line.0);
-                            //         std::process::exit(0);
-                            //     }
-                            // }
                     }
                     helpers::Action::Exit => {
                         disable_raw_mode();
@@ -324,9 +301,6 @@ fn handle_input(ui_out_chan : Sender<UIStuff>, process_chan : Sender<String> ) {
                         if let Some(new_selected) = current_ui.selected.clone() {
                             let ns = new_selected.clone();
                             current_ui.selected = None;
-                            // if ns + 1 < filtered_lines.read().await.len() {
-                            //     *selected = Some(ns + 1);
-                            // }
                         }
                     }
                     helpers::Action::Other => () 
@@ -336,16 +310,12 @@ fn handle_input(ui_out_chan : Sender<UIStuff>, process_chan : Sender<String> ) {
 
             if current_ui != last_ui {
                 last_ui = current_ui.clone();
-                let now = SystemTime::now();
-                let end = now.duration_since(UNIX_EPOCH)
-                    .expect("Time went backwards");
-                let _ = ui_out_chan.send(current_ui.clone()).await; 
-                let _ = process_chan.send(current_ui.input.clone()).await;
-
+                let _ = process_chan.send(current_ui.input.clone());
+                let _ = ui_out_chan.send(current_ui.clone()); 
+                tokio::task::yield_now().await;
 
             }
         }
-        tokio::time::sleep(Duration::from_secs(100000)).await;
     });
 }
 
@@ -380,26 +350,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let cursor_position = Arc::new(RwLock::new(0));
 
     terminal.clear()?;
-    let (ui_send, ui_recv) = tokio::sync::mpsc::channel::<UIStuff>(1);
-    let (input_send, input_recv) = tokio::sync::mpsc::channel::<String>(1);
-    let (processed_send, processed_recv) = tokio::sync::mpsc::channel::<Vec<(String, Vec<usize>)>>(1);
-    let _ = input_send.send(String::new()).await; 
+    let (ui_send, ui_recv) = tokio::sync::mpsc::unbounded_channel::<UIStuff>();
+    let (input_send, input_recv) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let (processed_send, processed_recv) = tokio::sync::mpsc::unbounded_channel::<Vec<(String, Vec<usize>)>>();
+    let _ = input_send.send(String::new()); 
     handle_input(ui_send, input_send);
     process_input(input_recv, processed_send, &all_lines);
     render(&all_lines, terminal, list_state, processed_recv, ui_recv);
     tokio::time::sleep(Duration::from_secs(1000000)).await;
     Ok(())
-    //render(&all_lines, &filtered_lines, terminal,  list_state).await;
-    // loop {
-    //
-    //     if event::poll(Duration::from_millis(100))? {
-    //         let _ = helpers::do_handle(
-    //             cursor_position.clone(),
-    //             input.clone(),
-    //             filtered_lines.clone(),
-    //             all_lines.clone(),
-    //             &mut selected,
-    //         ).await;
-    //     }
-    // }
 }
