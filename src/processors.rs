@@ -22,7 +22,7 @@ use tokio::sync::watch::{Receiver, Sender};
 
 use crate::{helpers, types};
 
-pub fn stdin_reader2(
+pub fn stdin_reader(
     reader: BufReader<Stdin>,
     out_chan: UnboundedSender<Vec<(String, Vec<usize>)>>,
 ) {
