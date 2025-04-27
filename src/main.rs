@@ -59,16 +59,12 @@ fn stdin_reader2(
     });
 }
 
-
-
-
 fn render(
     mut terminal: Terminal<CrosstermBackend<Stderr>>,
     mut list_state: ListState,
     mut new_data_chan: Receiver<(usize, Vec<(String, Vec<usize>)>)>,
     mut ui_chan: Receiver<UIStuff>,
     mut movement_chan: UnboundedReceiver<Movement>,
-    //total_lines : Arc<AtomicUsize>
 ) {
     tokio::spawn(async move {
         tokio::task::yield_now().await;
@@ -101,8 +97,6 @@ fn render(
                 }
             };
 
-            //let total_len = z.clone().read().await.len();
-            //tokio::task::block_in_place(|| {
                 terminal
                     .draw(|f| {
                         let size = f.size();
@@ -170,7 +164,6 @@ fn render(
                         real_selected =
                             Some(padding_rows + index_from_top.saturating_sub(start_idx));
 
-                        //let lines = total_lines.load(Ordering::Relaxed);
                         let label = format!("[ {}/{} ]", selected.unwrap_or(0), lines);
                         let label_width = label.len() as u16;
                         let divider_fill = if chunks[1].width > label_width {
@@ -216,7 +209,6 @@ fn render(
                         f.render_stateful_widget(list, chunks[0], &mut list_state);
                     })
                     .unwrap();
-            // });
             tokio::task::yield_now().await;
         }
     });
