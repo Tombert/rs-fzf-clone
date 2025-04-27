@@ -1,5 +1,23 @@
 use crate::types;
 use crossterm::event::{Event, KeyCode};
+use ratatui::{style::{Color, Modifier, Style}, text::{Line, Span, Text}, widgets::ListItem};
+
+pub fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
+    let mut spans = Vec::with_capacity(line.len());
+    for (i, c) in line.chars().enumerate() {
+        if hits.contains(&i) {
+            spans.push(Span::styled(
+                c.to_string(),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ));
+        } else {
+            spans.push(Span::styled(c.to_string(), Style::default()));
+        }
+    }
+    ListItem::new(Text::from(vec![Line::from(spans)]))
+}
 
 pub fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
     let mut input_index = 0;
