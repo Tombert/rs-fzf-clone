@@ -18,14 +18,10 @@ use ratatui::widgets::Paragraph;
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
 mod helpers;
 
-use rayon::prelude::*;
 use tokio::sync::watch::{Receiver, Sender};
 use std::collections::HashMap;
 use std::io::{self, Stderr};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::sync::RwLock;
 
 fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     let mut spans = Vec::with_capacity(line.len());
@@ -42,26 +38,6 @@ fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
         }
     }
     ListItem::new(Text::from(vec![Line::from(spans)]))
-}
-
-fn stdin_reader(
-    state: Arc<RwLock<Vec<(String, Vec<usize>)>>>,
-    reader: BufReader<Stdin>,
-    out_chan: Sender<Option<String>>,
-    total_lines: Arc<AtomicUsize>
-) {
-    let mut lines = reader.lines();
-    tokio::spawn(async move {
-        let mut counter = 0;
-        while let Ok(Some(line)) = lines.next_line().await {
-            state.write().await.push((line, Vec::new()));
-            if counter == 0 {
-                let _ = out_chan.send(None);
-            }
-            counter = (counter + 1) % 10000;
-            total_lines.fetch_add(1, Ordering::Relaxed); 
-        }
-    });
 }
 
 fn stdin_reader2( 
@@ -87,7 +63,6 @@ fn stdin_reader2(
 
 
 fn render(
-    all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
     mut terminal: Terminal<CrosstermBackend<Stderr>>,
     mut list_state: ListState,
     mut new_data_chan: Receiver<(usize, Vec<(String, Vec<usize>)>)>,
@@ -95,7 +70,6 @@ fn render(
     mut movement_chan: UnboundedReceiver<Movement>,
     //total_lines : Arc<AtomicUsize>
 ) {
-    let z = all_lines.clone();
     tokio::spawn(async move {
         tokio::task::yield_now().await;
         let mut filtered_lines: Vec<(String, Vec<usize>)> = Vec::new();
@@ -423,9 +397,9 @@ fn handle_input(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdin = tokio::io::stdin();
     let reader = BufReader::new(stdin);
-    let all_lines = Arc::new(RwLock::new(Vec::new()));
+    //let all_lines = Arc::new(RwLock::new(Vec::new()));
     //let filtered_lines = Arc::new(RwLock::new(Vec::new()));
-    let total_lines = Arc::new(AtomicUsize::new(0));
+    //let total_lines = Arc::new(AtomicUsize::new(0));
     let (ui_send, ui_recv) = tokio::sync::watch::channel::<UIStuff>(UIStuff {
         cursor_position: 0,
         input: "".to_string(),
@@ -460,7 +434,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //stdin_reader(all_lines.clone(), reader, input_send.clone(), total_lines.clone());
     
     render(
-        &all_lines,
         terminal,
         list_state,
         processed_recv,
