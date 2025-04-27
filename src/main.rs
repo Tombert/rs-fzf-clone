@@ -2,6 +2,7 @@ use crossterm::event::{self, EnableMouseCapture};
 use crossterm::terminal::LeaveAlternateScreen;
 use crossterm::terminal::disable_raw_mode;
 use crossterm::terminal::enable_raw_mode;
+use itertools::Itertools;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Modifier, Style};
@@ -54,7 +55,7 @@ fn stdin_reader(
             if counter == 0 {
                 let _ = out_chan.send(None);
             }
-            counter = (counter + 1) % 10000;
+            counter = (counter + 1) % 1;
         }
     });
 }
@@ -76,7 +77,6 @@ fn render(
         let def = if filtered_lines.len() > 0 {filtered_lines.len() - 1} else {0};
         loop {
             let t = selected.unwrap_or(def);
-            let mut hit_enter = false; 
             let mut movement = None; 
             selected = Some(t);
             (filtered_lines, ui_stuff, movement) = tokio::select! {
@@ -292,9 +292,9 @@ fn process_input(
                     });
 
                 let mut buff = Vec::new();
-                for i in 0..50 {
+                for key in indexed.keys().sorted().cloned() {
                     let temp = Vec::new();
-                    let current = indexed.get(&(50 - i)).unwrap_or(&temp);
+                    let current = indexed.get(&key).unwrap_or(&temp);
                     let slice = current[..BUFF_SIZE.min(current.len())].to_vec();
                     buff.extend(slice);
                     if buff.len() >= BUFF_SIZE {

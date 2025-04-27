@@ -421,6 +421,7 @@ dependencies = [
  "color",
  "crossterm",
  "futures",
+ "itertools",
  "ratatui",
  "rayon",
  "tokio",
