@@ -49,8 +49,9 @@ fn stdin_reader2(reader: BufReader<Stdin>, out_chan: UnboundedSender<Vec<(String
             buff.push((line, Vec::new()));
 
             if buff.len() >= 2000 {
-                let _ = out_chan.send(buff.clone());
-                buff.clear();
+                let _ = out_chan.send(buff);
+                buff = Vec::new(); 
+                //buff.clear();
             }
         }
         let _ = out_chan.send(buff.clone());
