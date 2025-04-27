@@ -5,6 +5,7 @@ use itertools::Itertools;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Modifier, Style};
+use rayon::iter::*;
 use tokio::io::{AsyncBufReadExt, BufReader, Stdin};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
@@ -317,15 +318,20 @@ pub fn process_input(
             if !query.is_empty() {
                 let (new_all_lines, buff) = tokio::task::spawn_blocking(move || {
                     let indexed = all_lines
-                        .iter()
+                        .par_iter()
                         .filter_map(|(line, _)| {
                             helpers::fuzzy_search(input2.as_str(), line.as_str())
                         })
-                        .fold(HashMap::new(), |mut acc, (s, v)| {
+                        .fold(HashMap::new, |mut acc, (s, v)| {
                             let key = helpers::get_delta(&v);
                             acc.entry(key).or_insert_with(Vec::new).push((s, v));
                             acc
-                        });
+                        }).reduce(HashMap::new, |mut map1, map2| {
+                         for (key, mut vec) in map2 {
+                             map1.entry(key).or_insert_with(Vec::new).append(&mut vec);
+                         }
+                         map1
+                     });
 
                     let mut buff = Vec::new();
                     for key in indexed.keys().sorted().cloned() {
