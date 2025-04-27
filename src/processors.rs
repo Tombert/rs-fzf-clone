@@ -64,18 +64,17 @@ pub fn render(
             let t = selected.unwrap_or(def);
             let movement;
             selected = Some(t);
-            (filtered_lines, ui_stuff, movement) = tokio::select! {
+            (filtered_lines, ui_stuff, movement, lines) = tokio::select! {
                  _ = new_data_chan.changed() => {
                      let (list_size, new_l) = new_data_chan.borrow().clone();
-                     lines = list_size;
-                    (new_l, ui_stuff, None)
+                    (new_l, ui_stuff, None, list_size)
                 },
                 _ = ui_chan.changed() =>{
                     let ui_new = ui_chan.borrow().clone();
-                    (filtered_lines, Some(ui_new), None)
+                    (filtered_lines, Some(ui_new), None, lines)
                 },
                 m = movement_chan.recv() => {
-                    (filtered_lines, ui_stuff, m)
+                    (filtered_lines, ui_stuff, m, lines)
                 }
             };
 
