@@ -208,6 +208,7 @@ fn render(
                     })
                     .unwrap();
             });
+        tokio::task::yield_now().await;
         }
     });
 }
@@ -352,19 +353,9 @@ fn handle_input(
                         
                         let _ = movement_chan.send(Movement::Up);
 
-                        // if let Some(new_selected) = current_ui.selected.clone() {
-                        //     let ns = new_selected.clone();
-                        //     if ns > 0 {
-                        //         current_ui.selected = Some(ns - 1);
-                        //     }
-                        // }
                     }
                     helpers::Action::MoveDown => {
                         let _ = movement_chan.send(Movement::Down);
-                        // if let Some(new_selected) = current_ui.selected.clone() {
-                        //     let ns = new_selected.clone();
-                        //     current_ui.selected = None;
-                        // }
                     }
                     helpers::Action::Other => (),
                 }
@@ -390,7 +381,7 @@ fn handle_input(
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let stdin = tokio::io::stdin(); // 
+    let stdin = tokio::io::stdin();  
     let reader = BufReader::new(stdin);
     let all_lines = Arc::new(RwLock::new(Vec::new()));
     let filtered_lines = Arc::new(RwLock::new(Vec::new()));
@@ -400,7 +391,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::sync::mpsc::unbounded_channel::<Vec<(String, Vec<usize>)>>();
     let (movement_send, movement_recv) =
         tokio::sync::mpsc::unbounded_channel::<Movement>();
-    //let (source_send, source_recv) = tokio::sync::watch::channel::<Option<usize>>(None);
 
     stdin_reader(all_lines.clone(), reader, input_send.clone());
 
