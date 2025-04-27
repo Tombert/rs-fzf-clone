@@ -18,10 +18,10 @@ use ratatui::widgets::Paragraph;
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
 mod helpers;
 
-use tokio::sync::watch::{Receiver, Sender};
 use std::collections::HashMap;
 use std::io::{self, Stderr};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::watch::{Receiver, Sender};
 
 fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     let mut spans = Vec::with_capacity(line.len());
@@ -40,19 +40,16 @@ fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     ListItem::new(Text::from(vec![Line::from(spans)]))
 }
 
-fn stdin_reader2( 
-    reader: BufReader<Stdin>,
-    out_chan : UnboundedSender<Vec<(String, Vec<usize>)>>,
-) {
+fn stdin_reader2(reader: BufReader<Stdin>, out_chan: UnboundedSender<Vec<(String, Vec<usize>)>>) {
     let mut lines = reader.lines();
     tokio::spawn(async move {
-        let mut buff = Vec::new(); 
-        while let Ok(Some(line)) = lines.next_line().await { 
+        let mut buff = Vec::new();
+        while let Ok(Some(line)) = lines.next_line().await {
             buff.push((line, Vec::new()));
 
             if buff.len() >= 2000 {
-               let _ = out_chan.send(buff.clone());
-               buff.clear(); 
+                let _ = out_chan.send(buff.clone());
+                buff.clear();
             }
         }
         let _ = out_chan.send(buff.clone());
@@ -80,16 +77,16 @@ fn render(
         loop {
             let t = selected.unwrap_or(def);
             let movement;
-            let mut lines = 0; 
+            let mut lines = 0;
             selected = Some(t);
             (filtered_lines, ui_stuff, movement) = tokio::select! {
                  _ = new_data_chan.changed() => {
-                     let (list_size, new_l) = new_data_chan.borrow().clone(); 
-                     lines = list_size; 
+                     let (list_size, new_l) = new_data_chan.borrow().clone();
+                     lines = list_size;
                     (new_l, ui_stuff, None)
                 },
                 _ = ui_chan.changed() =>{
-                    let ui_new = ui_chan.borrow().clone(); 
+                    let ui_new = ui_chan.borrow().clone();
                     (filtered_lines, Some(ui_new), None)
                 },
                 m = movement_chan.recv() => {
@@ -97,118 +94,116 @@ fn render(
                 }
             };
 
-                terminal
-                    .draw(|f| {
-                        let size = f.size();
-                        let chunks = Layout::default()
-                            .direction(Direction::Vertical)
-                            .margin(1)
-                            .constraints(
-                                [
-                                    Constraint::Min(1),
-                                    Constraint::Length(1),
-                                    Constraint::Length(3),
-                                ]
-                                .as_ref(),
-                            )
-                            .split(size);
+            terminal
+                .draw(|f| {
+                    let size = f.size();
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .margin(1)
+                        .constraints(
+                            [
+                                Constraint::Min(1),
+                                Constraint::Length(1),
+                                Constraint::Length(3),
+                            ]
+                            .as_ref(),
+                        )
+                        .split(size);
 
-                        let ui = ui_stuff.clone().unwrap_or(UIStuff {
-                            cursor_position: 0,
-                            input: "".to_string(),
-                            enter: false,
-                        });
+                    let ui = ui_stuff.clone().unwrap_or(UIStuff {
+                        cursor_position: 0,
+                        input: "".to_string(),
+                        enter: false,
+                    });
 
-                        let list_height = chunks[0].height as usize;
-                        let actual_items_to_show = filtered_lines.len().min(list_height);
+                    let list_height = chunks[0].height as usize;
+                    let actual_items_to_show = filtered_lines.len().min(list_height);
 
-                        let padding_rows = list_height.saturating_sub(actual_items_to_show);
+                    let padding_rows = list_height.saturating_sub(actual_items_to_show);
 
-                        let start_idx = if filtered_lines.len() > list_height {
-                            filtered_lines.len() - list_height
-                        } else {
-                            0
-                        };
-                        if let Some(m) = movement {
-                            match m {
-                                Movement::Down => {
-                                    let current_selected = selected.unwrap_or(0);
-                                    if current_selected > 0 {
-                                        let new_selected = current_selected - 1;
-                                        selected = Some(new_selected);
-                                    }
-                                }
-                                Movement::Up => {
-                                    let current_selected = selected.unwrap_or(0);
-                                    let new_selected = current_selected + 1;
+                    let start_idx = if filtered_lines.len() > list_height {
+                        filtered_lines.len() - list_height
+                    } else {
+                        0
+                    };
+                    if let Some(m) = movement {
+                        match m {
+                            Movement::Down => {
+                                let current_selected = selected.unwrap_or(0);
+                                if current_selected > 0 {
+                                    let new_selected = current_selected - 1;
                                     selected = Some(new_selected);
                                 }
+                            }
+                            Movement::Up => {
+                                let current_selected = selected.unwrap_or(0);
+                                let new_selected = current_selected + 1;
+                                selected = Some(new_selected);
+                            }
 
-                                Movement::Enter => {
-                                    if let Some(sel) = real_selected {
-                                        let selected_idx =
-                                            sel.saturating_sub(padding_rows) + start_idx;
-                                        if let Some(line) = filtered_lines.get(selected_idx) {
-                                            let _ = disable_raw_mode();
-                                            let _ = execute!(io::stderr(), LeaveAlternateScreen);
-                                            println!("{}", line.0);
-                                            std::process::exit(0);
-                                        }
+                            Movement::Enter => {
+                                if let Some(sel) = real_selected {
+                                    let selected_idx = sel.saturating_sub(padding_rows) + start_idx;
+                                    if let Some(line) = filtered_lines.get(selected_idx) {
+                                        let _ = disable_raw_mode();
+                                        let _ = execute!(io::stderr(), LeaveAlternateScreen);
+                                        println!("{}", line.0);
+                                        std::process::exit(0);
                                     }
                                 }
                             }
                         }
-                        let index_from_bottom = selected.unwrap_or(0);
-                        let max_idx = filtered_lines.len().saturating_sub(1);
-                        let index_from_top = max_idx.saturating_sub(index_from_bottom);
-                        real_selected =
-                            Some(padding_rows + index_from_top.saturating_sub(start_idx));
+                    }
+                    let index_from_bottom = selected.unwrap_or(0);
+                    let max_idx = filtered_lines.len().saturating_sub(1);
+                    let index_from_top = max_idx.saturating_sub(index_from_bottom);
+                    real_selected = Some(padding_rows + index_from_top.saturating_sub(start_idx));
 
-                        let label = format!("[ {}/{} ]", selected.unwrap_or(0), lines);
-                        let label_width = label.len() as u16;
-                        let divider_fill = if chunks[1].width > label_width {
-                            "─".repeat((chunks[1].width - label_width - 1) as usize)
-                        } else {
-                            "".to_string()
-                        };
+                    let label = format!("[ {}/{} ]", selected.unwrap_or(0), lines);
+                    let label_width = label.len() as u16;
+                    let divider_fill = if chunks[1].width > label_width {
+                        "─".repeat((chunks[1].width - label_width - 1) as usize)
+                    } else {
+                        "".to_string()
+                    };
 
-                        let divider_line = Paragraph::new(Line::from(vec![
-                            Span::styled(label, Style::default().fg(Color::Gray)),
-                            Span::raw(" "),
-                            Span::styled(divider_fill, Style::default().fg(Color::DarkGray)),
-                        ]));
-                        f.render_widget(divider_line, chunks[1]);
+                    let divider_line = Paragraph::new(Line::from(vec![
+                        Span::styled(label, Style::default().fg(Color::Gray)),
+                        Span::raw(" "),
+                        Span::styled(divider_fill, Style::default().fg(Color::DarkGray)),
+                    ]));
+                    f.render_widget(divider_line, chunks[1]);
 
-                        let input_para = Paragraph::new(Text::from(vec![Line::from(vec![
-                            Span::styled("> ", Style::default().fg(Color::Blue)),
-                            Span::raw(ui.clone().input),
-                        ])]))
-                        .block(Block::default().borders(Borders::NONE));
-                        f.render_widget(input_para, chunks[2]);
-                        f.set_cursor(chunks[2].x + 2 + ui.cursor_position as u16, chunks[2].y);
+                    let input_para = Paragraph::new(Text::from(vec![Line::from(vec![
+                        Span::styled("> ", Style::default().fg(Color::Blue)),
+                        Span::raw(ui.clone().input),
+                    ])]))
+                    .block(Block::default().borders(Borders::NONE));
+                    f.render_widget(input_para, chunks[2]);
+                    f.set_cursor(chunks[2].x + 2 + ui.cursor_position as u16, chunks[2].y);
 
-                        let items_to_render = {
-                            let items = (0..padding_rows)
-                                .map(|_| ListItem::new(""))
-                                .chain(
-                                    filtered_lines
-                                        .iter()
-                                        .take(list_height)
-                                        .map(|(line, hits)| styled_line(line, hits)),
-                                )
-                                .collect::<Vec<_>>();
-                            items
-                        };
+                    let items_to_render = {
+                        let items = (0..padding_rows)
+                            .map(|_| ListItem::new(""))
+                            .chain(
+                                filtered_lines
+                                    .iter()
+                                    .take(list_height)
+                                    .map(|(line, hits)| styled_line(line, hits)),
+                            )
+                            .collect::<Vec<_>>();
+                        items
+                    };
 
-                        let list = List::new(items_to_render)
-                            .block(Block::default().borders(Borders::NONE))
-                            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+                    let list = List::new(items_to_render)
+                        .block(Block::default().borders(Borders::NONE))
+                        .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
-                        list_state.select(real_selected);
+                    list_state.select(real_selected);
 
-                        f.render_stateful_widget(list, chunks[0], &mut list_state);
-                    })
-                    .unwrap();
+                    f.render_stateful_widget(list, chunks[0], &mut list_state);
+                })
+                .unwrap();
             tokio::task::yield_now().await;
         }
     });
@@ -224,18 +219,17 @@ struct UIStuff {
 fn process_input(
     mut in_chan: Receiver<Option<String>>,
     out_chan: Sender<(usize, Vec<(String, Vec<usize>)>)>,
-    mut source_chan : UnboundedReceiver<Vec<(String,Vec<usize>)>>
-    //all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
+    mut source_chan: UnboundedReceiver<Vec<(String, Vec<usize>)>>, //all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
 ) {
     //let all_lines = all_lines.clone();
     let mut input = "".to_string();
     const BUFF_SIZE: usize = 100;
     tokio::spawn(async move {
-        let mut all_lines = Vec::new(); 
+        let mut all_lines = Vec::new();
         loop {
             let query = tokio::select! {
                 _ = in_chan.changed() => {
-                    let r = in_chan.borrow().clone(); 
+                    let r = in_chan.borrow().clone();
                     match r {
                         Some(r) => r.clone(),
                         None => input
@@ -250,14 +244,15 @@ fn process_input(
             };
 
             input = query.clone();
-            let input2 = input.clone(); 
+            let input2 = input.clone();
 
             if !query.is_empty() {
-                let (new_all_lines, buff) = tokio::task::spawn_blocking( move || {
-                    let indexed =
-                        all_lines
+                let (new_all_lines, buff) = tokio::task::spawn_blocking(move || {
+                    let indexed = all_lines
                         .iter()
-                        .filter_map(|(line, _)| helpers::fuzzy_search(input2.as_str(), line.as_str()))
+                        .filter_map(|(line, _)| {
+                            helpers::fuzzy_search(input2.as_str(), line.as_str())
+                        })
                         .fold(HashMap::new(), |mut acc, (s, v)| {
                             let key = helpers::get_delta(&v);
                             acc.entry(key).or_insert_with(Vec::new).push((s, v));
@@ -275,8 +270,10 @@ fn process_input(
                         }
                     }
                     buff.reverse();
-                    (all_lines,buff)
-                }).await.expect(""); 
+                    (all_lines, buff)
+                })
+                .await
+                .expect("");
                 all_lines = new_all_lines;
                 let _ = out_chan.send((all_lines.len(), buff));
             } else {
@@ -299,7 +296,6 @@ fn handle_input(
     movement_chan: UnboundedSender<Movement>,
 ) {
     tokio::spawn(async move {
-
         let mut last_ui = UIStuff {
             input: String::new(),
             enter: false,
@@ -395,15 +391,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (ui_send, ui_recv) = tokio::sync::watch::channel::<UIStuff>(UIStuff {
         cursor_position: 0,
         input: "".to_string(),
-        enter: false
-
+        enter: false,
     });
     let (input_send, input_recv) = tokio::sync::watch::channel::<Option<String>>(None);
     let (processed_send, processed_recv) =
         tokio::sync::watch::channel::<(usize, Vec<(String, Vec<usize>)>)>((0, Vec::new()));
     let (movement_send, movement_recv) = tokio::sync::mpsc::unbounded_channel::<Movement>();
-    let (all_line_send, all_lines_recv) = tokio::sync::mpsc::unbounded_channel::<Vec<(String, Vec<usize>)>>();
-
+    let (all_line_send, all_lines_recv) =
+        tokio::sync::mpsc::unbounded_channel::<Vec<(String, Vec<usize>)>>();
 
     // {
     //     let mut f = filtered_lines.write().await;
@@ -424,14 +419,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     process_input(input_recv, processed_send, all_lines_recv);
     stdin_reader2(reader, all_line_send);
     //stdin_reader(all_lines.clone(), reader, input_send.clone(), total_lines.clone());
-    
-    render(
-        terminal,
-        list_state,
-        processed_recv,
-        ui_recv,
-        movement_recv,
-    );
+
+    render(terminal, list_state, processed_recv, ui_recv, movement_recv);
     futures::future::pending::<()>().await;
     Ok(())
 }
