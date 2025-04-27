@@ -305,8 +305,8 @@ pub fn process_input(
                     }
                 },
                 new_lines = source_chan.recv() => {
-                    if let Some(x) = new_lines {
-                        all_lines.extend(x);
+                    if let Some(mut x) = new_lines {
+                        all_lines.append(&mut x);  // Moves out of `x`, no clone!
                     }
                     input
                 }
