@@ -72,6 +72,7 @@ fn render(
         let mut filtered_lines: Vec<(String, Vec<usize>)> = Vec::new();
         let mut ui_stuff = None;
         let mut selected = None; 
+        let mut real_selected : Option<usize> = None; 
         let def = if filtered_lines.len() > 0 {filtered_lines.len() - 1} else {0};
         loop {
             let t = selected.unwrap_or(def);
@@ -116,31 +117,29 @@ fn render(
                         });
                         if let Some(m) = movement {
                             match m {
-                                Movement::Up => {
+                                Movement::Down => {
                                     let current_selected = selected.unwrap_or(0);
                                     if current_selected > 0 {
                                         let new_selected = current_selected - 1; 
                                         selected = Some(new_selected); 
                                     }
                                 }, 
-                                Movement::Down => {
+                                Movement::Up => {
                                     let current_selected = selected.unwrap_or(0);
                                     let new_selected = current_selected + 1; 
                                     selected = Some(new_selected); 
                                 },
 
                                 Movement::Enter => {
-                                    if let Some(sel) = selected {
+                                    if let Some(sel) = real_selected {
                                         if let Some(line) = filtered_lines.get(sel) {
                                             let _ = disable_raw_mode();
                                             let _ = execute!(io::stderr(), LeaveAlternateScreen);
                                             println!("{}", line.0);
                                             std::process::exit(0);
                                         }
-
                                     }
                                 }
-
                             }
                         }
 
@@ -169,41 +168,53 @@ fn render(
                         f.set_cursor(chunks[2].x + 2 + ui.cursor_position as u16, chunks[2].y);
 
                         let list_height = chunks[0].height as usize;
+                        real_selected = selected.map(|f| list_height.saturating_sub(f)-1);
                         let actual_items_to_show = filtered_lines.len().min(list_height);
 
                         let padding_rows = list_height.saturating_sub(actual_items_to_show);
 
-                        let (items_to_render, real_selected) =
-                            if filtered_lines.len() <= list_height {
-                                let padded_items = (0..padding_rows)
-                                    .map(|_| ListItem::new(""))
-                                    .chain(
-                                        filtered_lines[..filtered_lines.len().min(100)]
-                                        .iter()
-                                        .map(|(line, hits)| styled_line(line, hits)),
-                                    )
-                                    .collect::<Vec<_>>();
-
-                                let real_selected = Some(padded_items.len().saturating_sub(1));
-                                (padded_items, real_selected)
-                            } else {
-                                let selected_idx = selected.unwrap_or(0);
-                                let start_idx = if selected_idx + 1 >= list_height {
-                                    selected_idx + 1 - list_height
-                                } else {
-                                    0
-                                };
+                        let items_to_render  = {
                                 let items = filtered_lines
                                     .par_iter()
-                                    .skip(start_idx)
+                                    //.skip(start_idx)
                                     .take(list_height)
                                     .map(|(line, hits)| styled_line(line, hits))
                                     .collect::<Vec<_>>();
+                            items 
+                        };
 
-                                // 🔥 This is the fix:
-                                let real_selected = Some(items.len().saturating_sub(1));
-                                (items, real_selected)
-                            };
+
+                        // let (items_to_render, real_selected) =
+                        //     if filtered_lines.len() <= list_height {
+                        //         let padded_items = (0..padding_rows)
+                        //             .map(|_| ListItem::new(""))
+                        //             .chain(
+                        //                 filtered_lines[..filtered_lines.len().min(100)]
+                        //                     .iter()
+                        //                     .map(|(line, hits)| styled_line(line, hits)),
+                        //             )
+                        //             .collect::<Vec<_>>();
+                        //
+                        //         let real_selected = selected.map(|sel| sel + padding_rows );
+                        //         (padded_items, real_selected)
+                        //     } else {
+                        //         let selected_idx = selected.unwrap_or(0) + 1;
+                        //         let start_idx = if selected_idx + 1 >= list_height {
+                        //             selected_idx + 1 - list_height
+                        //         } else {
+                        //             0
+                        //         };
+                        //         let items = filtered_lines
+                        //             .par_iter()
+                        //             .skip(start_idx)
+                        //             .take(list_height)
+                        //             .map(|(line, hits)| styled_line(line, hits))
+                        //             .collect::<Vec<_>>();
+                        //
+                        //         let real_selected =
+                        //             selected.map(|sel| sel.saturating_sub(start_idx) );
+                        //         (items, real_selected)
+                        //     };
 
                         let list = List::new(items_to_render)
                             .block(Block::default().borders(Borders::NONE))
@@ -357,7 +368,7 @@ fn handle_input(
                     }
                     helpers::Action::MoveUp => {
                         
-                        movement_chan.send(Movement::Up);
+                        let _ = movement_chan.send(Movement::Up);
 
                         // if let Some(new_selected) = current_ui.selected.clone() {
                         //     let ns = new_selected.clone();
@@ -367,7 +378,7 @@ fn handle_input(
                         // }
                     }
                     helpers::Action::MoveDown => {
-                        movement_chan.send(Movement::Down);
+                        let _ = movement_chan.send(Movement::Down);
                         // if let Some(new_selected) = current_ui.selected.clone() {
                         //     let ns = new_selected.clone();
                         //     current_ui.selected = None;
