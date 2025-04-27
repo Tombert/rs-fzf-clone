@@ -66,18 +66,22 @@ fn render(
     mut list_state: ListState,
     mut new_data_chan: UnboundedReceiver<Vec<(String, Vec<usize>)>>,
     mut ui_chan: UnboundedReceiver<UIStuff>,
-    mut movement_chan : UnboundedReceiver<Movement>
+    mut movement_chan: UnboundedReceiver<Movement>,
 ) {
     let z = all_lines.clone();
     tokio::spawn(async move {
         let mut filtered_lines: Vec<(String, Vec<usize>)> = Vec::new();
         let mut ui_stuff = None;
-        let mut selected = None; 
-        let mut real_selected : Option<usize> = None; 
-        let def = if filtered_lines.len() > 0 {filtered_lines.len() - 1} else {0};
+        let mut selected = None;
+        let mut real_selected: Option<usize> = None;
+        let def = if filtered_lines.len() > 0 {
+            filtered_lines.len() - 1
+        } else {
+            0
+        };
         loop {
             let t = selected.unwrap_or(def);
-            let mut movement = None; 
+            let mut movement = None;
             selected = Some(t);
             (filtered_lines, ui_stuff, movement) = tokio::select! {
                 new_l = new_data_chan.recv() => {
@@ -90,7 +94,6 @@ fn render(
                     (filtered_lines, ui_stuff, m)
                 }
             };
-
 
             let total_len = z.clone().read().await.len();
             tokio::task::block_in_place(|| {
@@ -131,19 +134,20 @@ fn render(
                                 Movement::Down => {
                                     let current_selected = selected.unwrap_or(0);
                                     if current_selected > 0 {
-                                        let new_selected = current_selected - 1; 
-                                        selected = Some(new_selected); 
+                                        let new_selected = current_selected - 1;
+                                        selected = Some(new_selected);
                                     }
-                                }, 
+                                }
                                 Movement::Up => {
                                     let current_selected = selected.unwrap_or(0);
-                                    let new_selected = current_selected + 1; 
-                                    selected = Some(new_selected); 
-                                },
+                                    let new_selected = current_selected + 1;
+                                    selected = Some(new_selected);
+                                }
 
                                 Movement::Enter => {
                                     if let Some(sel) = real_selected {
-                                        let selected_idx = sel.saturating_sub(padding_rows) + start_idx;
+                                        let selected_idx =
+                                            sel.saturating_sub(padding_rows) + start_idx;
                                         if let Some(line) = filtered_lines.get(selected_idx) {
                                             let _ = disable_raw_mode();
                                             let _ = execute!(io::stderr(), LeaveAlternateScreen);
@@ -157,7 +161,8 @@ fn render(
                         let index_from_bottom = selected.unwrap_or(0);
                         let max_idx = filtered_lines.len().saturating_sub(1);
                         let index_from_top = max_idx.saturating_sub(index_from_bottom);
-                        real_selected = Some(padding_rows + index_from_top.saturating_sub(start_idx));
+                        real_selected =
+                            Some(padding_rows + index_from_top.saturating_sub(start_idx));
 
                         let label = format!("[ {}/{} ]", selected.unwrap_or(0), total_len);
                         let label_width = label.len() as u16;
@@ -182,19 +187,17 @@ fn render(
                         f.render_widget(input_para, chunks[2]);
                         f.set_cursor(chunks[2].x + 2 + ui.cursor_position as u16, chunks[2].y);
 
-
-                        let items_to_render  = {
-                                let items = 
-                                    (0..padding_rows)
-                                    .map(|_| ListItem::new(""))
-                                    .chain(
-                                        filtered_lines
+                        let items_to_render = {
+                            let items = (0..padding_rows)
+                                .map(|_| ListItem::new(""))
+                                .chain(
+                                    filtered_lines
                                         .iter()
                                         .take(list_height)
                                         .map(|(line, hits)| styled_line(line, hits)),
-                                        )
-                                    .collect::<Vec<_>>();
-                            items 
+                                )
+                                .collect::<Vec<_>>();
+                            items
                         };
 
                         let list = List::new(items_to_render)
@@ -203,12 +206,11 @@ fn render(
 
                         list_state.select(real_selected);
 
-
                         f.render_stateful_widget(list, chunks[0], &mut list_state);
                     })
                     .unwrap();
             });
-        tokio::task::yield_now().await;
+            tokio::task::yield_now().await;
         }
     });
 }
@@ -227,7 +229,7 @@ fn process_input(
 ) {
     let all_lines = all_lines.clone();
     let mut input = "".to_string();
-    const BUFF_SIZE : usize = 100;
+    const BUFF_SIZE: usize = 100;
     tokio::spawn(async move {
         loop {
             let query = match in_chan.recv().await {
@@ -283,13 +285,13 @@ fn process_input(
 enum Movement {
     Up,
     Down,
-    Enter
+    Enter,
 }
 
 fn handle_input(
     ui_out_chan: UnboundedSender<UIStuff>,
     process_chan: UnboundedSender<Option<String>>,
-    movement_chan: UnboundedSender<Movement>
+    movement_chan: UnboundedSender<Movement>,
 ) {
     tokio::spawn(async move {
         let mut last_ui = UIStuff {
@@ -326,8 +328,8 @@ fn handle_input(
                         current_ui.input.clear();
                     }
                     helpers::Action::Select => {
-                        let _ = movement_chan.send(Movement::Enter); 
-                    },
+                        let _ = movement_chan.send(Movement::Enter);
+                    }
                     helpers::Action::Exit => {
                         let _ = disable_raw_mode();
                         let _ = execute!(io::stderr(), LeaveAlternateScreen);
@@ -350,9 +352,7 @@ fn handle_input(
                         }
                     }
                     helpers::Action::MoveUp => {
-                        
                         let _ = movement_chan.send(Movement::Up);
-
                     }
                     helpers::Action::MoveDown => {
                         let _ = movement_chan.send(Movement::Down);
@@ -381,7 +381,7 @@ fn handle_input(
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let stdin = tokio::io::stdin();  
+    let stdin = tokio::io::stdin();
     let reader = BufReader::new(stdin);
     let all_lines = Arc::new(RwLock::new(Vec::new()));
     let filtered_lines = Arc::new(RwLock::new(Vec::new()));
@@ -389,8 +389,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (input_send, input_recv) = tokio::sync::mpsc::unbounded_channel::<Option<String>>();
     let (processed_send, processed_recv) =
         tokio::sync::mpsc::unbounded_channel::<Vec<(String, Vec<usize>)>>();
-    let (movement_send, movement_recv) =
-        tokio::sync::mpsc::unbounded_channel::<Movement>();
+    let (movement_send, movement_recv) = tokio::sync::mpsc::unbounded_channel::<Movement>();
 
     stdin_reader(all_lines.clone(), reader, input_send.clone());
 
@@ -411,7 +410,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = input_send.send(None);
     handle_input(ui_send, input_send, movement_send);
     process_input(input_recv, processed_send, &all_lines);
-    render(&all_lines, terminal, list_state, processed_recv, ui_recv, movement_recv);
+    render(
+        &all_lines,
+        terminal,
+        list_state,
+        processed_recv,
+        ui_recv,
+        movement_recv,
+    );
     futures::future::pending::<()>().await;
     Ok(())
 }
