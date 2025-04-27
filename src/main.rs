@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let reader = BufReader::new(stdin);
     let (ui_send, ui_recv) = tokio::sync::watch::channel::<types::UIStuff>(types::UIStuff {
         cursor_position: 0,
-        input: "".to_string(),
+        input: String::new(),
         enter: false,
     });
     let (input_send, input_recv) = tokio::sync::watch::channel::<Option<String>>(None);

@@ -97,7 +97,7 @@ pub fn render(
 
                     let ui = ui_stuff.clone().unwrap_or(types::UIStuff {
                         cursor_position: 0,
-                        input: "".to_string(),
+                        input: String::new(),
                         enter: false,
                     });
 
@@ -149,7 +149,7 @@ pub fn render(
                     let divider_fill = if chunks[1].width > label_width {
                         "─".repeat((chunks[1].width - label_width - 1) as usize)
                     } else {
-                        "".to_string()
+                       String::new() 
                     };
 
                     let divider_line = Paragraph::new(Line::from(vec![
@@ -291,7 +291,7 @@ pub fn process_input(
     mut source_chan: UnboundedReceiver<Vec<(String, Vec<usize>)>>,
 ) {
     //let all_lines = all_lines.clone();
-    let mut input = "".to_string();
+    let mut input = String::new();
     const BUFF_SIZE: usize = 100;
     tokio::spawn(async move {
         let mut all_lines = Vec::new();
