@@ -137,7 +137,6 @@ fn render(
 
                                 Movement::Enter => {
                                     if let Some(sel) = real_selected {
-                                        println!("Poop: {}", sel);
                                         if padding_rows > 0 {
                                             if let Some(line) = filtered_lines.get(sel-2) {
                                                 let _ = disable_raw_mode();
