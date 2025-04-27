@@ -1,4 +1,5 @@
 use crossterm::event::{Event, KeyCode};
+use crate::types;
 
 pub fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
     let mut input_index = 0;
@@ -44,91 +45,77 @@ pub fn get_delta(input: &Vec<usize>) -> usize {
     delta
 }
 
-pub enum Action {
-    MoveLeft,
-    MoveRight,
-    MoveUp,
-    MoveDown,
-    MoveEnd,
-    MoveBegin,
-    Exit,
-    Select,
-    ClearAll,
-    BackSpace,
-    Other,
-    Key(char),
-}
 
-pub fn parse_action(ev: Event) -> Action {
+pub fn parse_action(ev: Event) -> types::Action {
     match ev {
         Event::Key(key) => match key.code {
-            KeyCode::Backspace => Action::BackSpace,
-            KeyCode::Enter => Action::Select,
-            KeyCode::Esc => Action::Exit,
+            KeyCode::Backspace => types::Action::BackSpace,
+            KeyCode::Enter => types::Action::Select,
+            KeyCode::Esc => types::Action::Exit,
             KeyCode::Char('u')
                 if key
                     .modifiers
                     .contains(crossterm::event::KeyModifiers::CONTROL) =>
             {
-                Action::ClearAll
+                types::Action::ClearAll
             }
             KeyCode::Char('c')
                 if key
                     .modifiers
                     .contains(crossterm::event::KeyModifiers::CONTROL) =>
             {
-                Action::Exit
+                types::Action::Exit
             }
             KeyCode::Char('e')
                 if key
                     .modifiers
                     .contains(crossterm::event::KeyModifiers::CONTROL) =>
             {
-                Action::MoveEnd
+                types::Action::MoveEnd
             }
             KeyCode::Char('a')
                 if key
                     .modifiers
                     .contains(crossterm::event::KeyModifiers::CONTROL) =>
             {
-                Action::MoveBegin
+                types::Action::MoveBegin
             }
 
-            KeyCode::Up => Action::MoveUp,
+            KeyCode::Up => types::Action::MoveUp,
             KeyCode::Char('p')
                 if key
                     .modifiers
                     .contains(crossterm::event::KeyModifiers::CONTROL) =>
             {
-                Action::MoveUp
+                types::Action::MoveUp
             }
-            KeyCode::Down => Action::MoveDown,
+            KeyCode::Down => types::Action::MoveDown,
             KeyCode::Char('n')
                 if key
                     .modifiers
                     .contains(crossterm::event::KeyModifiers::CONTROL) =>
             {
-                Action::MoveDown
+                types::Action::MoveDown
             }
-            KeyCode::Left => Action::MoveLeft,
+            KeyCode::Left => types::Action::MoveLeft,
             KeyCode::Char('b')
                 if key
                     .modifiers
                     .contains(crossterm::event::KeyModifiers::CONTROL) =>
             {
-                Action::MoveLeft
+                types::Action::MoveLeft
             }
-            KeyCode::Right => Action::MoveRight,
+            KeyCode::Right => types::Action::MoveRight,
             KeyCode::Char('f')
                 if key
                     .modifiers
                     .contains(crossterm::event::KeyModifiers::CONTROL) =>
             {
-                Action::MoveRight
+                types::Action::MoveRight
             }
-            KeyCode::Char(c) => Action::Key(c),
-            _ => Action::Other,
+            KeyCode::Char(c) => types::Action::Key(c),
+            _ => types::Action::Other,
         },
-        _ => Action::Other,
+        _ => types::Action::Other,
     }
 }

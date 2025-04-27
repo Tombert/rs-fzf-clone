@@ -17,6 +17,7 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
 mod helpers;
+mod types;
 
 use std::collections::HashMap;
 use std::io::{self, Stderr};
@@ -61,7 +62,7 @@ fn render(
     mut list_state: ListState,
     mut new_data_chan: Receiver<(usize, Vec<(String, Vec<usize>)>)>,
     mut ui_chan: Receiver<UIStuff>,
-    mut movement_chan: UnboundedReceiver<Movement>,
+    mut movement_chan: UnboundedReceiver<types::Movement>,
 ) {
     tokio::spawn(async move {
         tokio::task::yield_now().await;
@@ -128,20 +129,20 @@ fn render(
                     };
                     if let Some(m) = movement {
                         match m {
-                            Movement::Down => {
+                            types::Movement::Down => {
                                 let current_selected = selected.unwrap_or(0);
                                 if current_selected > 0 {
                                     let new_selected = current_selected - 1;
                                     selected = Some(new_selected);
                                 }
                             }
-                            Movement::Up => {
+                            types::Movement::Up => {
                                 let current_selected = selected.unwrap_or(0);
                                 let new_selected = current_selected + 1;
                                 selected = Some(new_selected);
                             }
 
-                            Movement::Enter => {
+                            types::Movement::Enter => {
                                 if let Some(sel) = real_selected {
                                     let selected_idx = sel.saturating_sub(padding_rows) + start_idx;
                                     if let Some(line) = filtered_lines.get(selected_idx) {
@@ -284,16 +285,11 @@ fn process_input(
     });
 }
 
-enum Movement {
-    Up,
-    Down,
-    Enter,
-}
 
 fn handle_input(
     ui_out_chan: Sender<UIStuff>,
     process_chan: Sender<Option<String>>,
-    movement_chan: UnboundedSender<Movement>,
+    movement_chan: UnboundedSender<types::Movement>,
 ) {
     tokio::spawn(async move {
         let mut last_ui = UIStuff {
@@ -331,7 +327,7 @@ fn handle_input(
                         current_ui.input.clear();
                     }
                     helpers::Action::Select => {
-                        let _ = movement_chan.send(Movement::Enter);
+                        let _ = movement_chan.send(types::Movement::Enter);
                     }
                     helpers::Action::Exit => {
                         let _ = disable_raw_mode();
@@ -355,10 +351,10 @@ fn handle_input(
                         }
                     }
                     helpers::Action::MoveUp => {
-                        let _ = movement_chan.send(Movement::Up);
+                        let _ = movement_chan.send(types::Movement::Up);
                     }
                     helpers::Action::MoveDown => {
-                        let _ = movement_chan.send(Movement::Down);
+                        let _ = movement_chan.send(types::Movement::Down);
                     }
                     helpers::Action::Other => (),
                 }
@@ -396,7 +392,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (input_send, input_recv) = tokio::sync::watch::channel::<Option<String>>(None);
     let (processed_send, processed_recv) =
         tokio::sync::watch::channel::<(usize, Vec<(String, Vec<usize>)>)>((0, Vec::new()));
-    let (movement_send, movement_recv) = tokio::sync::mpsc::unbounded_channel::<Movement>();
+    let (movement_send, movement_recv) = tokio::sync::mpsc::unbounded_channel::<types::Movement>();
     let (all_line_send, all_lines_recv) =
         tokio::sync::mpsc::unbounded_channel::<Vec<(String, Vec<usize>)>>();
 
