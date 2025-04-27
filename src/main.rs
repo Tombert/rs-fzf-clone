@@ -75,10 +75,10 @@ fn render(
         } else {
             0
         };
+        let mut lines = 0;
         loop {
             let t = selected.unwrap_or(def);
             let movement;
-            let mut lines = 0;
             selected = Some(t);
             (filtered_lines, ui_stuff, movement) = tokio::select! {
                  _ = new_data_chan.changed() => {
