@@ -67,7 +67,7 @@ pub fn render(
             (filtered_lines, ui_stuff, movement, lines) = tokio::select! {
                  _ = new_data_chan.changed() => {
                      let (list_size, new_l) = new_data_chan.borrow().clone();
-                    (new_l, ui_stuff, None, list_size)
+                     (new_l, ui_stuff, None, list_size)
                 },
                 _ = ui_chan.changed() =>{
                     let ui_new = ui_chan.borrow().clone();
@@ -94,27 +94,22 @@ pub fn render(
                         )
                         .split(size);
 
-                    let ui = 
-                        ui_stuff
-                        .clone()
-                        .unwrap_or(
-                            types::UIStuff {
-                                cursor_position: 0,
-                                input: String::new(),
-                                enter: false,
-                            });
+                    let ui = ui_stuff.clone().unwrap_or(types::UIStuff {
+                        cursor_position: 0,
+                        input: String::new(),
+                        enter: false,
+                    });
 
                     let list_height = chunks[0].height as usize;
                     let actual_items_to_show = filtered_lines.len().min(list_height);
 
                     let padding_rows = list_height.saturating_sub(actual_items_to_show);
 
-                    let start_idx = 
-                        if filtered_lines.len() > list_height {
-                            filtered_lines.len() - list_height
-                        } else {
-                            0
-                        };
+                    let start_idx = if filtered_lines.len() > list_height {
+                        filtered_lines.len() - list_height
+                    } else {
+                        0
+                    };
                     if let Some(m) = movement {
                         match m {
                             types::Movement::Down => {
@@ -153,7 +148,7 @@ pub fn render(
                     let divider_fill = if chunks[1].width > label_width {
                         "─".repeat((chunks[1].width - label_width - 1) as usize)
                     } else {
-                       String::new() 
+                        String::new()
                     };
 
                     let divider_line = Paragraph::new(Line::from(vec![
