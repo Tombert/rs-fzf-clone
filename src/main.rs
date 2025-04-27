@@ -158,9 +158,7 @@ fn render(
                         let max_idx = filtered_lines.len().saturating_sub(1);
                         let index_from_top = max_idx.saturating_sub(index_from_bottom);
                         real_selected = Some(padding_rows + index_from_top.saturating_sub(start_idx));
-                        //real_selected = selected.map(|sel| sel + padding_rows);
 
-                        //let selected_display = ui.selected.unwrap_or(0) + 1; // 1-based indexing
                         let label = format!("[ {}/{} ]", selected.unwrap_or(0), total_len);
                         let label_width = label.len() as u16;
                         let divider_fill = if chunks[1].width > label_width {
@@ -192,47 +190,12 @@ fn render(
                                     .chain(
                                         filtered_lines
                                         .iter()
-                                        //.par_iter()
-                                        //.skip(start_idx)
                                         .take(list_height)
                                         .map(|(line, hits)| styled_line(line, hits)),
                                         )
                                     .collect::<Vec<_>>();
                             items 
                         };
-
-
-                        // let (items_to_render, real_selected) =
-                        //     if filtered_lines.len() <= list_height {
-                        //         let padded_items = (0..padding_rows)
-                        //             .map(|_| ListItem::new(""))
-                        //             .chain(
-                        //                 filtered_lines[..filtered_lines.len().min(100)]
-                        //                     .iter()
-                        //                     .map(|(line, hits)| styled_line(line, hits)),
-                        //             )
-                        //             .collect::<Vec<_>>();
-                        //
-                        //         let real_selected = selected.map(|sel| sel + padding_rows );
-                        //         (padded_items, real_selected)
-                        //     } else {
-                        //         let selected_idx = selected.unwrap_or(0) + 1;
-                        //         let start_idx = if selected_idx + 1 >= list_height {
-                        //             selected_idx + 1 - list_height
-                        //         } else {
-                        //             0
-                        //         };
-                        //         let items = filtered_lines
-                        //             .par_iter()
-                        //             .skip(start_idx)
-                        //             .take(list_height)
-                        //             .map(|(line, hits)| styled_line(line, hits))
-                        //             .collect::<Vec<_>>();
-                        //
-                        //         let real_selected =
-                        //             selected.map(|sel| sel.saturating_sub(start_idx) );
-                        //         (items, real_selected)
-                        //     };
 
                         let list = List::new(items_to_render)
                             .block(Block::default().borders(Borders::NONE))
@@ -362,7 +325,7 @@ fn handle_input(
                         current_ui.input.clear();
                     }
                     helpers::Action::Select => {
-                        movement_chan.send(Movement::Enter); 
+                        let _ = movement_chan.send(Movement::Enter); 
                     },
                     helpers::Action::Exit => {
                         let _ = disable_raw_mode();
