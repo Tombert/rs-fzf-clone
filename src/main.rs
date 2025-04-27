@@ -86,26 +86,6 @@ fn render(
                     (filtered_lines, ui_new, None)
                 },
                 m = movement_chan.recv() => {
-                    // if let Some(m) = m {
-                    //     match m {
-                    //         Movement::Down => {
-                    //             let current_selected = selected.unwrap_or(0);
-                    //             let new_selected = current_selected + 1; 
-                    //             selected = Some(new_selected); 
-                    //         },
-                    //         Movement::Up => {
-                    //             let current_selected = selected.unwrap_or(0);
-                    //             if current_selected > 0 {
-                    //                 let new_selected = current_selected - 1; 
-                    //                 selected = Some(new_selected); 
-                    //             }
-                    //         },
-                    //         Movement::Enter => {
-                    //             hit_enter = true; 
-                    //         }
-                    //     }
-                    // }
-
                     (filtered_lines, ui_stuff, m)
                 }
             };
@@ -199,15 +179,20 @@ fn render(
                                     .map(|_| ListItem::new(""))
                                     .chain(
                                         filtered_lines[..filtered_lines.len().min(100)]
-                                            .iter()
-                                            .map(|(line, hits)| styled_line(line, hits)),
+                                        .iter()
+                                        .map(|(line, hits)| styled_line(line, hits)),
                                     )
                                     .collect::<Vec<_>>();
 
-                                let real_selected = selected.map(|sel| sel + padding_rows);
+                                let real_selected = Some(padded_items.len().saturating_sub(1));
                                 (padded_items, real_selected)
                             } else {
-                                let start_idx = filtered_lines.len() - list_height;
+                                let selected_idx = selected.unwrap_or(0);
+                                let start_idx = if selected_idx + 1 >= list_height {
+                                    selected_idx + 1 - list_height
+                                } else {
+                                    0
+                                };
                                 let items = filtered_lines
                                     .par_iter()
                                     .skip(start_idx)
@@ -215,8 +200,8 @@ fn render(
                                     .map(|(line, hits)| styled_line(line, hits))
                                     .collect::<Vec<_>>();
 
-                                let real_selected =
-                                    selected.map(|sel| sel.saturating_sub(start_idx));
+                                // 🔥 This is the fix:
+                                let real_selected = Some(items.len().saturating_sub(1));
                                 (items, real_selected)
                             };
 
@@ -281,7 +266,7 @@ fn process_input(
                 let mut buff = Vec::new();
                 for i in 0..50 {
                     let temp = Vec::new();
-                    let current = indexed.get(&i).unwrap_or(&temp);
+                    let current = indexed.get(&(50 - i)).unwrap_or(&temp);
                     let slice = current[..BUFF_SIZE.min(current.len())].to_vec();
                     buff.extend(slice);
                     if buff.len() >= BUFF_SIZE {
