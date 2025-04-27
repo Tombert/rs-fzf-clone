@@ -115,6 +115,11 @@ fn render(
                             input: "".to_string(),
                             enter: false,
                         });
+
+                        let list_height = chunks[0].height as usize;
+                        let actual_items_to_show = filtered_lines.len().min(list_height);
+
+                        let padding_rows = list_height.saturating_sub(actual_items_to_show);
                         if let Some(m) = movement {
                             match m {
                                 Movement::Down => {
@@ -132,16 +137,28 @@ fn render(
 
                                 Movement::Enter => {
                                     if let Some(sel) = real_selected {
-                                        if let Some(line) = filtered_lines.get(sel) {
-                                            let _ = disable_raw_mode();
-                                            let _ = execute!(io::stderr(), LeaveAlternateScreen);
-                                            println!("{}", line.0);
-                                            std::process::exit(0);
+                                        println!("Poop: {}", sel);
+                                        if padding_rows > 0 {
+                                            if let Some(line) = filtered_lines.get(sel-2) {
+                                                let _ = disable_raw_mode();
+                                                let _ = execute!(io::stderr(), LeaveAlternateScreen);
+                                                println!("{}", line.0);
+                                                std::process::exit(0);
+                                            }
+                                        } else {
+                                            if let Some(line) = filtered_lines.get(sel) {
+                                                let _ = disable_raw_mode();
+                                                let _ = execute!(io::stderr(), LeaveAlternateScreen);
+                                                println!("{}", line.0);
+                                                std::process::exit(0);
+                                            }
+
                                         }
                                     }
                                 }
                             }
                         }
+                        real_selected = selected.map(|f| list_height.saturating_sub(f)-1);
 
                         //let selected_display = ui.selected.unwrap_or(0) + 1; // 1-based indexing
                         let label = format!("[ {}/{} ]", selected.unwrap_or(0), total_len);
@@ -167,18 +184,19 @@ fn render(
                         f.render_widget(input_para, chunks[2]);
                         f.set_cursor(chunks[2].x + 2 + ui.cursor_position as u16, chunks[2].y);
 
-                        let list_height = chunks[0].height as usize;
-                        real_selected = selected.map(|f| list_height.saturating_sub(f)-1);
-                        let actual_items_to_show = filtered_lines.len().min(list_height);
-
-                        let padding_rows = list_height.saturating_sub(actual_items_to_show);
 
                         let items_to_render  = {
-                                let items = filtered_lines
-                                    .par_iter()
-                                    //.skip(start_idx)
-                                    .take(list_height)
-                                    .map(|(line, hits)| styled_line(line, hits))
+                                let items = 
+                                    (0..padding_rows)
+                                    .map(|_| ListItem::new(""))
+                                    .chain(
+                                        filtered_lines
+                                        .iter()
+                                        //.par_iter()
+                                        //.skip(start_idx)
+                                        .take(list_height)
+                                        .map(|(line, hits)| styled_line(line, hits)),
+                                        )
                                     .collect::<Vec<_>>();
                             items 
                         };
