@@ -120,6 +120,12 @@ fn render(
                         let actual_items_to_show = filtered_lines.len().min(list_height);
 
                         let padding_rows = list_height.saturating_sub(actual_items_to_show);
+
+                        let start_idx = if filtered_lines.len() > list_height {
+                            filtered_lines.len() - list_height
+                        } else {
+                            0
+                        };
                         if let Some(m) = movement {
                             match m {
                                 Movement::Down => {
@@ -137,27 +143,22 @@ fn render(
 
                                 Movement::Enter => {
                                     if let Some(sel) = real_selected {
-                                        if padding_rows > 0 {
-                                            if let Some(line) = filtered_lines.get(sel-2) {
-                                                let _ = disable_raw_mode();
-                                                let _ = execute!(io::stderr(), LeaveAlternateScreen);
-                                                println!("{}", line.0);
-                                                std::process::exit(0);
-                                            }
-                                        } else {
-                                            if let Some(line) = filtered_lines.get(sel) {
-                                                let _ = disable_raw_mode();
-                                                let _ = execute!(io::stderr(), LeaveAlternateScreen);
-                                                println!("{}", line.0);
-                                                std::process::exit(0);
-                                            }
-
+                                        let selected_idx = sel.saturating_sub(padding_rows) + start_idx;
+                                        if let Some(line) = filtered_lines.get(selected_idx) {
+                                            let _ = disable_raw_mode();
+                                            let _ = execute!(io::stderr(), LeaveAlternateScreen);
+                                            println!("{}", line.0);
+                                            std::process::exit(0);
                                         }
                                     }
                                 }
                             }
                         }
-                        real_selected = selected.map(|f| list_height.saturating_sub(f)-1);
+                        let index_from_bottom = selected.unwrap_or(0);
+                        let max_idx = filtered_lines.len().saturating_sub(1);
+                        let index_from_top = max_idx.saturating_sub(index_from_bottom);
+                        real_selected = Some(padding_rows + index_from_top.saturating_sub(start_idx));
+                        //real_selected = selected.map(|sel| sel + padding_rows);
 
                         //let selected_display = ui.selected.unwrap_or(0) + 1; // 1-based indexing
                         let label = format!("[ {}/{} ]", selected.unwrap_or(0), total_len);
@@ -262,7 +263,7 @@ fn process_input(
 ) {
     let all_lines = all_lines.clone();
     let mut input = "".to_string();
-    const BUFF_SIZE : usize = 40;
+    const BUFF_SIZE : usize = 100;
     tokio::spawn(async move {
         loop {
             let query = match in_chan.recv().await {
@@ -301,6 +302,7 @@ fn process_input(
                         break;
                     }
                 }
+                buff.reverse();
 
                 let _ = out_chan.send(buff);
                 tokio::task::yield_now().await;
