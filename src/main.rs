@@ -307,56 +307,56 @@ fn handle_input(
             if let Ok(_) = event::poll(Duration::from_millis(50)) {
                 let res = match event::read() {
                     Ok(e) => helpers::parse_action(e),
-                    _ => helpers::Action::Other,
+                    _ => types::Action::Other,
                 };
                 match res {
-                    helpers::Action::Key(c) => {
+                    types::Action::Key(c) => {
                         if current_ui.cursor_position <= current_ui.input.len() {
                             current_ui.input.insert(current_ui.cursor_position, c);
                             current_ui.cursor_position += 1;
                         }
                     }
-                    helpers::Action::BackSpace => {
+                    types::Action::BackSpace => {
                         if current_ui.cursor_position > 0 {
                             current_ui.input.remove(current_ui.cursor_position - 1);
                             current_ui.cursor_position -= 1;
                         }
                     }
-                    helpers::Action::ClearAll => {
+                    types::Action::ClearAll => {
                         current_ui.cursor_position = 0;
                         current_ui.input.clear();
                     }
-                    helpers::Action::Select => {
+                    types::Action::Select => {
                         let _ = movement_chan.send(types::Movement::Enter);
                     }
-                    helpers::Action::Exit => {
+                    types::Action::Exit => {
                         let _ = disable_raw_mode();
                         let _ = execute!(io::stderr(), LeaveAlternateScreen);
                         std::process::exit(0);
                     }
-                    helpers::Action::MoveBegin => {
+                    types::Action::MoveBegin => {
                         current_ui.cursor_position = 0;
                     }
-                    helpers::Action::MoveEnd => {
+                    types::Action::MoveEnd => {
                         current_ui.cursor_position = current_ui.input.len();
                     }
-                    helpers::Action::MoveLeft => {
+                    types::Action::MoveLeft => {
                         if current_ui.cursor_position > 0 {
                             current_ui.cursor_position -= 1;
                         }
                     }
-                    helpers::Action::MoveRight => {
+                    types::Action::MoveRight => {
                         if current_ui.cursor_position < current_ui.input.len() {
                             current_ui.cursor_position += 1;
                         }
                     }
-                    helpers::Action::MoveUp => {
+                    types::Action::MoveUp => {
                         let _ = movement_chan.send(types::Movement::Up);
                     }
-                    helpers::Action::MoveDown => {
+                    types::Action::MoveDown => {
                         let _ = movement_chan.send(types::Movement::Down);
                     }
-                    helpers::Action::Other => (),
+                    types::Action::Other => (),
                 }
             }
 
