@@ -1,4 +1,3 @@
-
 #[derive(Clone, Eq, PartialEq)]
 pub struct UIStuff {
     pub input: String,
@@ -11,7 +10,6 @@ pub enum Movement {
     Down,
     Enter,
 }
-
 
 pub enum Action {
     MoveLeft,

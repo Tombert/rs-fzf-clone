@@ -22,9 +22,10 @@ use tokio::sync::watch::{Receiver, Sender};
 
 use crate::{helpers, types};
 
-pub fn stdin_reader2(reader: BufReader
-
-    <Stdin>, out_chan: UnboundedSender<Vec<(String, Vec<usize>)>>) {
+pub fn stdin_reader2(
+    reader: BufReader<Stdin>,
+    out_chan: UnboundedSender<Vec<(String, Vec<usize>)>>,
+) {
     let mut lines = reader.lines();
     tokio::spawn(async move {
         let mut buff = Vec::new();
@@ -33,7 +34,7 @@ pub fn stdin_reader2(reader: BufReader
 
             if buff.len() >= 2000 {
                 let _ = out_chan.send(buff);
-                buff = Vec::new(); 
+                buff = Vec::new();
             }
         }
         let _ = out_chan.send(buff.clone());
@@ -209,7 +210,6 @@ pub fn render(
     });
 }
 
-
 pub fn handle_input(
     ui_out_chan: Sender<types::UIStuff>,
     process_chan: Sender<Option<String>>,
@@ -301,12 +301,10 @@ pub fn handle_input(
     });
 }
 
-
-
 pub fn process_input(
     mut in_chan: Receiver<Option<String>>,
     out_chan: Sender<(usize, Vec<(String, Vec<usize>)>)>,
-    mut source_chan: UnboundedReceiver<Vec<(String, Vec<usize>)>>, 
+    mut source_chan: UnboundedReceiver<Vec<(String, Vec<usize>)>>,
 ) {
     //let all_lines = all_lines.clone();
     let mut input = "".to_string();

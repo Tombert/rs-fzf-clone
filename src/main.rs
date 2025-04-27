@@ -8,13 +8,10 @@ use crossterm::terminal::EnterAlternateScreen;
 use ratatui::Terminal;
 use ratatui::widgets::ListState;
 mod helpers;
-mod types;
 mod processors;
+mod types;
 
 use std::io::{self};
-
-
-
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -31,7 +28,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (movement_send, movement_recv) = tokio::sync::mpsc::unbounded_channel::<types::Movement>();
     let (all_line_send, all_lines_recv) =
         tokio::sync::mpsc::unbounded_channel::<Vec<(String, Vec<usize>)>>();
-
 
     let list_state = ListState::default();
 

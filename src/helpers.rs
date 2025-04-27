@@ -1,5 +1,5 @@
-use crossterm::event::{Event, KeyCode};
 use crate::types;
+use crossterm::event::{Event, KeyCode};
 
 pub fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
     let mut input_index = 0;
@@ -44,7 +44,6 @@ pub fn get_delta(input: &Vec<usize>) -> usize {
 
     delta
 }
-
 
 pub fn parse_action(ev: Event) -> types::Action {
     match ev {
