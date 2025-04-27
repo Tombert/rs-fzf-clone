@@ -64,14 +64,36 @@ fn stdin_reader(
     });
 }
 
+fn stdin_reader2( 
+    reader: BufReader<Stdin>,
+    out_chan : UnboundedSender<Vec<(String, Vec<usize>)>>,
+) {
+    let mut lines = reader.lines();
+    tokio::spawn(async move {
+        let mut buff = Vec::new(); 
+        while let Ok(Some(line)) = lines.next_line().await { 
+            buff.push((line, Vec::new()));
+
+            if buff.len() >= 2000 {
+               let _ = out_chan.send(buff.clone());
+               buff.clear(); 
+            }
+        }
+        let _ = out_chan.send(buff.clone());
+    });
+}
+
+
+
+
 fn render(
     all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
     mut terminal: Terminal<CrosstermBackend<Stderr>>,
     mut list_state: ListState,
-    mut new_data_chan: Receiver<Vec<(String, Vec<usize>)>>,
+    mut new_data_chan: Receiver<(usize, Vec<(String, Vec<usize>)>)>,
     mut ui_chan: Receiver<UIStuff>,
     mut movement_chan: UnboundedReceiver<Movement>,
-    total_lines : Arc<AtomicUsize>
+    //total_lines : Arc<AtomicUsize>
 ) {
     let z = all_lines.clone();
     tokio::spawn(async move {
@@ -88,10 +110,12 @@ fn render(
         loop {
             let t = selected.unwrap_or(def);
             let movement;
+            let mut lines = 0; 
             selected = Some(t);
             (filtered_lines, ui_stuff, movement) = tokio::select! {
                  _ = new_data_chan.changed() => {
-                     let new_l = new_data_chan.borrow().clone(); 
+                     let (list_size, new_l) = new_data_chan.borrow().clone(); 
+                     lines = list_size; 
                     (new_l, ui_stuff, None)
                 },
                 _ = ui_chan.changed() =>{
@@ -172,7 +196,7 @@ fn render(
                         real_selected =
                             Some(padding_rows + index_from_top.saturating_sub(start_idx));
 
-                        let lines = total_lines.load(Ordering::Relaxed);
+                        //let lines = total_lines.load(Ordering::Relaxed);
                         let label = format!("[ {}/{} ]", selected.unwrap_or(0), lines);
                         let label_width = label.len() as u16;
                         let divider_fill = if chunks[1].width > label_width {
@@ -233,39 +257,39 @@ struct UIStuff {
 
 fn process_input(
     mut in_chan: Receiver<Option<String>>,
-    out_chan: Sender<Vec<(String, Vec<usize>)>>,
-    all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
+    out_chan: Sender<(usize, Vec<(String, Vec<usize>)>)>,
+    mut source_chan : UnboundedReceiver<Vec<(String,Vec<usize>)>>
+    //all_lines: &Arc<RwLock<Vec<(String, Vec<usize>)>>>,
 ) {
-    let all_lines = all_lines.clone();
+    //let all_lines = all_lines.clone();
     let mut input = "".to_string();
     const BUFF_SIZE: usize = 100;
     tokio::spawn(async move {
+        let mut all_lines = Vec::new(); 
         loop {
-            let query = if in_chan.changed().await.is_ok() {
-                let r = in_chan.borrow().clone(); 
-                match r {
-                    Some(r) => r.clone(),
-                    None => input
-
+            let query = tokio::select! {
+                _ = in_chan.changed() => {
+                    let r = in_chan.borrow().clone(); 
+                    match r {
+                        Some(r) => r.clone(),
+                        None => input
+                    }
+                },
+                new_lines = source_chan.recv() => {
+                    if let Some(x) = new_lines {
+                        all_lines.extend(x);
+                    }
+                    input
                 }
-            } else {
-                input
             };
-                
-
-                // Some(Some(r)) => r.clone(),
-                // Some(None) => input,
-                // None => input,
 
             input = query.clone();
             let input2 = input.clone(); 
-            let aal = all_lines.clone();
 
             if !query.is_empty() {
-                let buff = tokio::task::spawn_blocking( move || {
-                    let al = aal.blocking_read();
+                let (new_all_lines, buff) = tokio::task::spawn_blocking( move || {
                     let indexed =
-                        al 
+                        all_lines
                         .iter()
                         .filter_map(|(line, _)| helpers::fuzzy_search(input2.as_str(), line.as_str()))
                         .fold(HashMap::new(), |mut acc, (s, v)| {
@@ -273,13 +297,6 @@ fn process_input(
                             acc.entry(key).or_insert_with(Vec::new).push((s, v));
                             acc
                         });
-
-                    // .reduce(HashMap::new, |mut map1, map2| {
-                    //     for (key, mut vec) in map2 {
-                    //         map1.entry(key).or_insert_with(Vec::new).append(&mut vec);
-                    //     }
-                    //     map1
-                    // });
 
                     let mut buff = Vec::new();
                     for key in indexed.keys().sorted().cloned() {
@@ -292,13 +309,13 @@ fn process_input(
                         }
                     }
                     buff.reverse();
-                    buff
+                    (all_lines,buff)
                 }).await.expect(""); 
-                let _ = out_chan.send(buff);
+                all_lines = new_all_lines;
+                let _ = out_chan.send((all_lines.len(), buff));
             } else {
-                let all_lines = all_lines.read().await;
                 let al = all_lines[..BUFF_SIZE.min(all_lines.len())].to_vec();
-                let _ = out_chan.send(al);
+                let _ = out_chan.send((all_lines.len(), al));
             }
         }
     });
@@ -407,7 +424,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdin = tokio::io::stdin();
     let reader = BufReader::new(stdin);
     let all_lines = Arc::new(RwLock::new(Vec::new()));
-    let filtered_lines = Arc::new(RwLock::new(Vec::new()));
+    //let filtered_lines = Arc::new(RwLock::new(Vec::new()));
     let total_lines = Arc::new(AtomicUsize::new(0));
     let (ui_send, ui_recv) = tokio::sync::watch::channel::<UIStuff>(UIStuff {
         cursor_position: 0,
@@ -417,15 +434,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     let (input_send, input_recv) = tokio::sync::watch::channel::<Option<String>>(None);
     let (processed_send, processed_recv) =
-        tokio::sync::watch::channel::<Vec<(String, Vec<usize>)>>(Vec::new());
+        tokio::sync::watch::channel::<(usize, Vec<(String, Vec<usize>)>)>((0, Vec::new()));
     let (movement_send, movement_recv) = tokio::sync::mpsc::unbounded_channel::<Movement>();
+    let (all_line_send, all_lines_recv) = tokio::sync::mpsc::unbounded_channel::<Vec<(String, Vec<usize>)>>();
 
-    stdin_reader(all_lines.clone(), reader, input_send.clone(), total_lines.clone());
 
-    {
-        let mut f = filtered_lines.write().await;
-        *f = all_lines.clone().read().await.clone();
-    }
+    // {
+    //     let mut f = filtered_lines.write().await;
+    //     *f = all_lines.clone().read().await.clone();
+    // }
 
     let list_state = ListState::default();
 
@@ -438,7 +455,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     terminal.clear()?;
     let _ = input_send.send(None);
     handle_input(ui_send, input_send, movement_send);
-    process_input(input_recv, processed_send, &all_lines);
+    process_input(input_recv, processed_send, all_lines_recv);
+    stdin_reader2(reader, all_line_send);
+    //stdin_reader(all_lines.clone(), reader, input_send.clone(), total_lines.clone());
+    
     render(
         &all_lines,
         terminal,
@@ -446,7 +466,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         processed_recv,
         ui_recv,
         movement_recv,
-        total_lines.clone()
     );
     futures::future::pending::<()>().await;
     Ok(())
