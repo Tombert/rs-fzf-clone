@@ -1,6 +1,10 @@
 use crate::types;
 use crossterm::event::{Event, KeyCode};
-use ratatui::{style::{Color, Modifier, Style}, text::{Line, Span, Text}, widgets::ListItem};
+use ratatui::{
+    style::{Color, Modifier, Style},
+    text::{Line, Span, Text},
+    widgets::ListItem,
+};
 
 pub fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     let mut spans = Vec::with_capacity(line.len());
