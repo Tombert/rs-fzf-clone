@@ -1,9 +1,9 @@
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct UIStuff {
-    input: String,
-    cursor_position: usize,
-    enter: bool,
+    pub input: String,
+    pub cursor_position: usize,
+    pub enter: bool,
 }
 
 pub enum Movement {
