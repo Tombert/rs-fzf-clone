@@ -94,22 +94,27 @@ pub fn render(
                         )
                         .split(size);
 
-                    let ui = ui_stuff.clone().unwrap_or(types::UIStuff {
-                        cursor_position: 0,
-                        input: String::new(),
-                        enter: false,
-                    });
+                    let ui = 
+                        ui_stuff
+                        .clone()
+                        .unwrap_or(
+                            types::UIStuff {
+                                cursor_position: 0,
+                                input: String::new(),
+                                enter: false,
+                            });
 
                     let list_height = chunks[0].height as usize;
                     let actual_items_to_show = filtered_lines.len().min(list_height);
 
                     let padding_rows = list_height.saturating_sub(actual_items_to_show);
 
-                    let start_idx = if filtered_lines.len() > list_height {
-                        filtered_lines.len() - list_height
-                    } else {
-                        0
-                    };
+                    let start_idx = 
+                        if filtered_lines.len() > list_height {
+                            filtered_lines.len() - list_height
+                        } else {
+                            0
+                        };
                     if let Some(m) = movement {
                         match m {
                             types::Movement::Down => {
@@ -143,7 +148,7 @@ pub fn render(
                     let index_from_top = max_idx.saturating_sub(index_from_bottom);
                     real_selected = Some(padding_rows + index_from_top.saturating_sub(start_idx));
 
-                    let label = format!("[ {}/{} ]", selected.unwrap_or(0), lines);
+                    let label = format!("[ {}/{} ]", selected.unwrap_or(0) + 1, lines);
                     let label_width = label.len() as u16;
                     let divider_fill = if chunks[1].width > label_width {
                         "─".repeat((chunks[1].width - label_width - 1) as usize)
@@ -152,9 +157,9 @@ pub fn render(
                     };
 
                     let divider_line = Paragraph::new(Line::from(vec![
-                        Span::styled(label, Style::default().fg(Color::Gray)),
+                        Span::styled(label, Style::default().fg(Color::LightGreen)),
                         Span::raw(" "),
-                        Span::styled(divider_fill, Style::default().fg(Color::DarkGray)),
+                        Span::styled(divider_fill, Style::default().fg(Color::LightCyan)),
                     ]));
                     f.render_widget(divider_line, chunks[1]);
 
