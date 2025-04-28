@@ -299,9 +299,7 @@ pub fn process_input(
     buff_size: usize,
     score_clamp: usize
 ) {
-    //let all_lines = all_lines.clone();
     let mut input = String::new();
-    //const BUFF_SIZE: usize = 100;
     tokio::spawn(async move {
         let mut all_lines = Vec::new();
         loop {
@@ -338,7 +336,6 @@ pub fn process_input(
                             let delta = helpers::get_delta(&v);
                             let key = delta.min(score_clamp);
                             helpers::vec_insert_expand(&mut acc, key, (s, v));
-                            //acc.entry(key).or_insert_with(Vec::new).push((s, v));
                             acc
                         })
                         .reduce(Vec::new, |mut vec1, vec2| {
