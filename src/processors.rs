@@ -24,6 +24,7 @@ use crate::{helpers, types};
 pub fn stdin_reader(
     reader: BufReader<Stdin>,
     out_chan: UnboundedSender<Vec<(String, Vec<usize>)>>,
+    batch_size: usize
 ) {
     let mut lines = reader.lines();
     tokio::spawn(async move {
@@ -31,7 +32,7 @@ pub fn stdin_reader(
         while let Ok(Some(line)) = lines.next_line().await {
             buff.push((line, Vec::new()));
 
-            if buff.len() >= 2000 {
+            if buff.len() >= batch_size {
                 let _ = out_chan.send(buff);
                 buff = Vec::new();
             }
@@ -295,10 +296,12 @@ pub fn process_input(
     mut in_chan: Receiver<Option<String>>,
     out_chan: Sender<(usize, Vec<(String, Vec<usize>)>)>,
     mut source_chan: UnboundedReceiver<Vec<(String, Vec<usize>)>>,
+    buff_size: usize,
+    score_clamp: usize
 ) {
     //let all_lines = all_lines.clone();
     let mut input = String::new();
-    const BUFF_SIZE: usize = 100;
+    //const BUFF_SIZE: usize = 100;
     tokio::spawn(async move {
         let mut all_lines = Vec::new();
         loop {
@@ -333,7 +336,7 @@ pub fn process_input(
                         })
                         .fold(Vec::new, |mut acc, (s, v)| {
                             let delta = helpers::get_delta(&v);
-                            let key = delta.min(50);
+                            let key = delta.min(score_clamp);
                             helpers::vec_insert_expand(&mut acc, key, (s, v));
                             //acc.entry(key).or_insert_with(Vec::new).push((s, v));
                             acc
@@ -353,11 +356,11 @@ pub fn process_input(
                     let mut buff = Vec::new();
                     for (_key, val) in indexed.iter().enumerate() {
                         if let Some(v) = val {
-                            let slice = v[..BUFF_SIZE.min(v.len())].to_vec();
+                            let slice = v[..buff_size.min(v.len())].to_vec();
                             buff.extend(slice.clone());
                         }
 
-                        if buff.len() >= BUFF_SIZE {
+                        if buff.len() >= buff_size {
                             break;
                         }
                     }
@@ -369,7 +372,7 @@ pub fn process_input(
                 all_lines = new_all_lines;
                 let _ = out_chan.send((all_lines.len(), buff));
             } else {
-                let al = all_lines[..BUFF_SIZE.min(all_lines.len())].to_vec();
+                let al = all_lines[..buff_size.min(all_lines.len())].to_vec();
                 let _ = out_chan.send((all_lines.len(), al));
             }
         }

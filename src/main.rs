@@ -2,6 +2,7 @@ use crossterm::event::EnableMouseCapture;
 use crossterm::terminal::enable_raw_mode;
 use ratatui::backend::CrosstermBackend;
 use tokio::io::BufReader;
+use clap::Parser;
 
 use crossterm::execute;
 use crossterm::terminal::EnterAlternateScreen;
@@ -15,6 +16,13 @@ use std::io::{self};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = types::Args::parse();
+
+    let buffsize = args.buffsize.unwrap_or(100);
+    let batchsize = args.batchsize.unwrap_or(50);
+    let scoreclamp = args.scoreclamp.unwrap_or(50);
+
+
     let stdin = tokio::io::stdin();
     let reader = BufReader::new(stdin);
     let (ui_send, ui_recv) = tokio::sync::watch::channel::<types::UIStuff>(types::UIStuff {
@@ -40,8 +48,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     terminal.clear()?;
     let _ = input_send.send(None);
     processors::handle_input(ui_send, input_send.clone(), movement_send);
-    processors::process_input(input_recv, processed_send.clone(), all_lines_recv);
-    processors::stdin_reader(reader, all_line_send.clone());
+    processors::process_input(input_recv, processed_send.clone(), all_lines_recv, buffsize, scoreclamp);
+    processors::stdin_reader(reader, all_line_send.clone(), batchsize);
 
     processors::render(terminal, list_state, processed_recv, ui_recv, movement_recv);
     futures::future::pending::<()>().await;
