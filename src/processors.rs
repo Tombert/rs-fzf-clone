@@ -325,26 +325,36 @@ pub fn process_input(
                         .filter_map(|(line, _)| {
                             helpers::fuzzy_search(input2.as_str(), line.as_str())
                         })
-                        .fold(HashMap::new, |mut acc, (s, v)| {
+                        .fold(Vec::new, |mut acc, (s, v)| {
                             let key = helpers::get_delta(&v);
-                            acc.entry(key).or_insert_with(Vec::new).push((s, v));
+                            helpers::vec_insert_expand(&mut acc, key, (s,v));
+                            //acc.entry(key).or_insert_with(Vec::new).push((s, v));
                             acc
                         })
-                        .reduce(HashMap::new, |mut map1, map2| {
-                            for (key, mut vec) in map2 {
-                                map1.entry(key).or_insert_with(Vec::new).append(&mut vec);
-                            }
-                            map1
-                        });
+                        .reduce(
+                            Vec::new,
+                            |mut vec1, vec2| {
+                                if vec2.len() > vec1.len() {
+                                    vec1.resize(vec2.len(), None);
+                                }
+                                for (i, maybe_vec) in vec2.into_iter().enumerate() {
+                                    if let Some(mut v) = maybe_vec {
+                                        vec1[i].get_or_insert_with(Vec::new).append(&mut v);
+                                    }
+                                }
+                                vec1
+                            },
+                        );
 
                     let mut buff = Vec::new();
-                    for key in indexed.keys().sorted().cloned() {
-                        let temp = Vec::new();
-                        let current = indexed.get(&key).unwrap_or(&temp);
-                        let slice = current[..BUFF_SIZE.min(current.len())].to_vec();
-                        buff.extend(slice);
+                    for (_key,val) in indexed.iter().enumerate() {
+                        if let Some(v) = val {
+                            let slice = v[..BUFF_SIZE.min(v.len())].to_vec();
+                            buff.extend(slice.clone());
+                        }
+
                         if buff.len() >= BUFF_SIZE {
-                            break;
+                            break; 
                         }
                     }
                     buff.reverse();

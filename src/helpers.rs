@@ -6,6 +6,13 @@ use ratatui::{
     widgets::ListItem,
 };
 
+pub fn vec_insert_expand<T>(vec: &mut Vec<Option<Vec<T>>>, index: usize, value: T) {
+    if vec.len() <= index {
+        vec.resize_with(index + 1, || None);
+    }
+    vec[index].get_or_insert_with(Vec::new).push(value);
+}
+
 pub fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     let mut spans = Vec::with_capacity(line.len());
     for (i, c) in line.chars().enumerate() {
