@@ -68,6 +68,11 @@ pub fn render(
             (filtered_lines, ui_stuff, movement, lines) = tokio::select! {
                  _ = new_data_chan.changed() => {
                      let (list_size, new_l) = new_data_chan.borrow().clone();
+                     if let Some(sel) = selected {
+                         if sel >= new_l.len() {
+                             selected = Some(new_l.len().saturating_sub(1));
+                         }
+                     }
                      (new_l, ui_stuff, None, list_size)
                 },
                 _ = ui_chan.changed() =>{
@@ -139,9 +144,9 @@ pub fn render(
                             }
                         }
                     }
-                    let index_from_bottom = selected.unwrap_or(0);
-                    let max_idx = filtered_lines.len().saturating_sub(1);
-                    let index_from_top = max_idx.saturating_sub(index_from_bottom);
+                    let visible_len = filtered_lines.len().min(list_height);
+                    let index_from_bottom = selected.unwrap_or(0).min(visible_len.saturating_sub(1));
+                    let index_from_top = visible_len.saturating_sub(1).saturating_sub(index_from_bottom);
                     real_selected = Some(padding_rows + index_from_top);
 
                     let label = format!("[ {}/{} ]", selected.unwrap_or(0) + 1, lines);
