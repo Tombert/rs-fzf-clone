@@ -143,8 +143,11 @@ pub fn render(
                         }
                     }
                     let visible_len = filtered_lines.len().min(list_height);
-                    let index_from_bottom = selected.unwrap_or(0).min(visible_len.saturating_sub(1));
-                    let index_from_top = visible_len.saturating_sub(1).saturating_sub(index_from_bottom);
+                    let index_from_bottom =
+                        selected.unwrap_or(0).min(visible_len.saturating_sub(1));
+                    let index_from_top = visible_len
+                        .saturating_sub(1)
+                        .saturating_sub(index_from_bottom);
                     real_selected = Some(padding_rows + index_from_top);
 
                     let label = format!("[ {}/{} ]", selected.unwrap_or(0) + 1, lines);
@@ -329,36 +332,33 @@ pub fn process_input(
                             helpers::fuzzy_search(input2.as_str(), line.as_str())
                         })
                         .fold(Vec::new, |mut acc, (s, v)| {
-                            let delta = helpers::get_delta(&v); 
-                            let key = delta.min(50); 
-                            helpers::vec_insert_expand(&mut acc, key, (s,v));
+                            let delta = helpers::get_delta(&v);
+                            let key = delta.min(50);
+                            helpers::vec_insert_expand(&mut acc, key, (s, v));
                             //acc.entry(key).or_insert_with(Vec::new).push((s, v));
                             acc
                         })
-                        .reduce(
-                            Vec::new,
-                            |mut vec1, vec2| {
-                                if vec2.len() > vec1.len() {
-                                    vec1.resize(vec2.len(), None);
+                        .reduce(Vec::new, |mut vec1, vec2| {
+                            if vec2.len() > vec1.len() {
+                                vec1.resize(vec2.len(), None);
+                            }
+                            for (i, maybe_vec) in vec2.into_iter().enumerate() {
+                                if let Some(mut v) = maybe_vec {
+                                    vec1[i].get_or_insert_with(Vec::new).append(&mut v);
                                 }
-                                for (i, maybe_vec) in vec2.into_iter().enumerate() {
-                                    if let Some(mut v) = maybe_vec {
-                                        vec1[i].get_or_insert_with(Vec::new).append(&mut v);
-                                    }
-                                }
-                                vec1
-                            },
-                        );
+                            }
+                            vec1
+                        });
 
                     let mut buff = Vec::new();
-                    for (_key,val) in indexed.iter().enumerate() {
+                    for (_key, val) in indexed.iter().enumerate() {
                         if let Some(v) = val {
                             let slice = v[..BUFF_SIZE.min(v.len())].to_vec();
                             buff.extend(slice.clone());
                         }
 
                         if buff.len() >= BUFF_SIZE {
-                            break; 
+                            break;
                         }
                     }
                     buff.reverse();
