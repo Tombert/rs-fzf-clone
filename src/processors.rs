@@ -24,7 +24,7 @@ use crate::{helpers, types};
 pub fn stdin_reader(
     reader: BufReader<Stdin>,
     out_chan: UnboundedSender<Vec<(String, Vec<usize>)>>,
-    batch_size: usize
+    batch_size: usize,
 ) {
     let mut lines = reader.lines();
     tokio::spawn(async move {
@@ -297,7 +297,7 @@ pub fn process_input(
     out_chan: Sender<(usize, Vec<(String, Vec<usize>)>)>,
     mut source_chan: UnboundedReceiver<Vec<(String, Vec<usize>)>>,
     buff_size: usize,
-    score_clamp: usize
+    score_clamp: usize,
 ) {
     let mut input = String::new();
     tokio::spawn(async move {

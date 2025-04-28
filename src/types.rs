@@ -27,7 +27,6 @@ pub enum Action {
     Key(char),
 }
 
-
 #[derive(Parser)]
 #[command(name = "sway-app-workspace-index")]
 #[command(author = "thomas@gebert.app")]
@@ -35,7 +34,7 @@ pub enum Action {
 #[command(about = "nada")]
 pub struct Args {
     #[arg(short, long)]
-    pub buffsize: Option<usize>, 
+    pub buffsize: Option<usize>,
 
     #[arg(short, long)]
     pub scoreclamp: Option<usize>,

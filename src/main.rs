@@ -1,8 +1,8 @@
+use clap::Parser;
 use crossterm::event::EnableMouseCapture;
 use crossterm::terminal::enable_raw_mode;
 use ratatui::backend::CrosstermBackend;
 use tokio::io::BufReader;
-use clap::Parser;
 
 use crossterm::execute;
 use crossterm::terminal::EnterAlternateScreen;
@@ -21,7 +21,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let buffsize = args.buffsize.unwrap_or(100);
     let batchsize = args.batchsize.unwrap_or(50);
     let scoreclamp = args.scoreclamp.unwrap_or(50);
-
 
     let stdin = tokio::io::stdin();
     let reader = BufReader::new(stdin);
@@ -48,7 +47,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     terminal.clear()?;
     let _ = input_send.send(None);
     processors::handle_input(ui_send, input_send.clone(), movement_send);
-    processors::process_input(input_recv, processed_send.clone(), all_lines_recv, buffsize, scoreclamp);
+    processors::process_input(
+        input_recv,
+        processed_send.clone(),
+        all_lines_recv,
+        buffsize,
+        scoreclamp,
+    );
     processors::stdin_reader(reader, all_line_send.clone(), batchsize);
 
     processors::render(terminal, list_state, processed_recv, ui_recv, movement_recv);
