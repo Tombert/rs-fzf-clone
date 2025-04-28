@@ -311,7 +311,6 @@ pub fn process_input(
                         None => input
                     };
 
-
                     let mut new_index :  Vec<Option<Vec<(String, Vec<usize>)>>> = Vec::new();
 
                     for  val in &index {
@@ -320,11 +319,11 @@ pub fn process_input(
                                 let search_res = helpers::fuzzy_search(ni.as_str(), i.as_str() ); 
                                 match search_res {
                                     Some((line, vv) ) => {
-                                        let delta = helpers::get_delta(&vv).min(70);
+                                        let delta = helpers::get_delta(&vv).min(score_clamp);
                                         helpers::vec_insert_expand(&mut new_index, delta, (line, vv))
                                     },
                                     None => {
-                                        helpers::vec_insert_expand(&mut new_index, 70, (i.clone(),Vec::new()));
+                                        helpers::vec_insert_expand(&mut new_index, score_clamp, (i.clone(),Vec::new()));
                                     }
                                 }
                             }
@@ -339,11 +338,11 @@ pub fn process_input(
                             let z = helpers::fuzzy_search(input.as_str(), i.as_str());
                             match z {
                                 Some((line, zzz)) => {
-                                    let delta = helpers::get_delta(&zzz).min(70);
+                                    let delta = helpers::get_delta(&zzz).min(score_clamp);
                                     helpers::vec_insert_expand(&mut index, delta, (line,zzz));
                                 }, 
                                 None => {
-                                    helpers::vec_insert_expand(&mut index, 70, (i,Vec::new()));
+                                    helpers::vec_insert_expand(&mut index, score_clamp, (i,Vec::new()));
                                 }
                             }
                         }
