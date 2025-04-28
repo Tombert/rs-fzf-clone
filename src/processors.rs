@@ -1,7 +1,6 @@
 use crossterm::event::{self};
 use crossterm::terminal::LeaveAlternateScreen;
 use crossterm::terminal::disable_raw_mode;
-use itertools::Itertools;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Modifier, Style};
@@ -16,7 +15,6 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
 
-use std::collections::HashMap;
 use std::io::{self, Stderr};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::watch::{Receiver, Sender};
@@ -331,7 +329,8 @@ pub fn process_input(
                             helpers::fuzzy_search(input2.as_str(), line.as_str())
                         })
                         .fold(Vec::new, |mut acc, (s, v)| {
-                            let key = helpers::get_delta(&v);
+                            let delta = helpers::get_delta(&v); 
+                            let key = delta.min(50); 
                             helpers::vec_insert_expand(&mut acc, key, (s,v));
                             //acc.entry(key).or_insert_with(Vec::new).push((s, v));
                             acc
