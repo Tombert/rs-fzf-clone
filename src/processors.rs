@@ -49,7 +49,6 @@ pub fn render(
     mut movement_chan: UnboundedReceiver<types::Movement>,
 ) {
     tokio::spawn(async move {
-        //tokio::task::yield_now().await;
         let mut filtered_lines: Vec<(String, Vec<usize>)> = Vec::new();
         let mut ui_stuff = None;
         let mut selected = None;
