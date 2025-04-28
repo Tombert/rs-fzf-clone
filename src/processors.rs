@@ -189,7 +189,7 @@ pub fn render(
                     f.render_stateful_widget(list, chunks[0], &mut list_state);
                 })
                 .unwrap();
-            tokio::time::sleep(Duration::from_millis(1)).await;
+            //tokio::time::sleep(Duration::from_millis(1)).await;
         }
     });
 }
@@ -305,8 +305,12 @@ pub fn process_input(
                     }
                 },
                 new_lines = source_chan.recv() => {
+                    if new_lines.is_none() {
+                        println!("source_chan closed!");
+                        //tokio::time::sleep(Duration::from_millis(1000)).await;  // just so you can see the print
+                    }
                     if let Some(mut x) = new_lines {
-                        all_lines.append(&mut x);  // Moves out of `x`, no clone!
+                        all_lines.append(&mut x);
                     }
                     input
                 }
@@ -355,7 +359,7 @@ pub fn process_input(
                 let al = all_lines[..BUFF_SIZE.min(all_lines.len())].to_vec();
                 let _ = out_chan.send((all_lines.len(), al));
             }
-            tokio::time::sleep(Duration::from_millis(1)).await;
+            //tokio::time::sleep(Duration::from_millis(1)).await;
         }
     });
 }

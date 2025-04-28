@@ -39,9 +39,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     terminal.clear()?;
     let _ = input_send.send(None);
-    processors::handle_input(ui_send, input_send, movement_send);
-    processors::process_input(input_recv, processed_send, all_lines_recv);
-    processors::stdin_reader(reader, all_line_send);
+    processors::handle_input(ui_send, input_send.clone(), movement_send);
+    processors::process_input(input_recv, processed_send.clone(), all_lines_recv);
+    processors::stdin_reader(reader, all_line_send.clone());
     //stdin_reader(all_lines.clone(), reader, input_send.clone(), total_lines.clone());
 
     processors::render(terminal, list_state, processed_recv, ui_recv, movement_recv);
