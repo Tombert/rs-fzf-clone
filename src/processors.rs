@@ -300,77 +300,130 @@ pub fn process_input(
 ) {
     let mut input = String::new();
     tokio::spawn(async move {
-        let mut all_lines = Vec::new();
+        //let mut all_lines = Vec::new();
+        let mut index :  Vec<Option<Vec<(String, Vec<usize>)>>> = Vec::new();
         loop {
             let query = tokio::select! {
                 _ = in_chan.changed() => {
                     let r = in_chan.borrow().clone();
-                    match r {
+                    let ni = match r {
                         Some(r) => r.clone(),
                         None => input
+                    };
+
+
+                    let mut new_index :  Vec<Option<Vec<(String, Vec<usize>)>>> = Vec::new();
+
+                    for  val in &index {
+                        if let Some(v) = val {
+                            for (i,_) in v {
+                                let search_res = helpers::fuzzy_search(ni.as_str(), i.as_str() ); 
+                                match search_res {
+                                    Some((line, vv) ) => {
+                                        let delta = helpers::get_delta(&vv);
+                                        helpers::vec_insert_expand(&mut new_index, delta, (line, vv))
+                                    },
+                                    None => {
+                                        helpers::vec_insert_expand(&mut new_index, 70, (i.clone(),Vec::new()));
+                                    }
+                                }
+                            }
+                        }
                     }
+                    index = new_index.clone(); 
+                    ni
                 },
                 new_lines = source_chan.recv() => {
-                    if new_lines.is_none() {
-                        println!("source_chan closed!");
-                    }
-                    if let Some(mut x) = new_lines {
-                        all_lines.append(&mut x);
+                    if let Some(x) = new_lines {
+                        for (i,_zz) in x {
+                            let z = helpers::fuzzy_search(input.as_str(), i.as_str());
+                            match z {
+                                Some((line, zzz)) => {
+                                    let delta = helpers::get_delta(&zzz);
+                                    helpers::vec_insert_expand(&mut index, delta, (line,zzz));
+                                }, 
+                                None => {
+                                    helpers::vec_insert_expand(&mut index, 70, (i,Vec::new()));
+                                }
+                            }
+                        }
                     }
                     input
                 }
             };
+            let mut buff = Vec::new(); 
+            let size = index.iter().fold(0, |a, b| {
+                let mut ns = 0; 
+                if let Some(bb) = b {
+                    ns += bb.len(); 
+
+                }
+                ns + a
+            });
+            for i in &index {
+                if let Some(j) = i {
+                    let slice = j[..buff_size.min(j.len())].to_vec();
+                    buff.extend(slice); 
+                }
+                if buff.len() > buff_size {
+                    break; 
+
+                }
+            }
 
             input = query.clone();
-            let input2 = input.clone();
+            buff.reverse(); 
 
-            if !query.is_empty() {
-                let (new_all_lines, buff) = tokio::task::spawn_blocking(move || {
-                    let indexed = all_lines
-                        .par_iter()
-                        .filter_map(|(line, _)| {
-                            helpers::fuzzy_search(input2.as_str(), line.as_str())
-                        })
-                        .fold(Vec::new, |mut acc, (s, v)| {
-                            let delta = helpers::get_delta(&v);
-                            let key = delta.min(score_clamp);
-                            helpers::vec_insert_expand(&mut acc, key, (s, v));
-                            acc
-                        })
-                        .reduce(Vec::new, |mut vec1, vec2| {
-                            if vec2.len() > vec1.len() {
-                                vec1.resize(vec2.len(), None);
-                            }
-                            for (i, maybe_vec) in vec2.into_iter().enumerate() {
-                                if let Some(mut v) = maybe_vec {
-                                    vec1[i].get_or_insert_with(Vec::new).append(&mut v);
-                                }
-                            }
-                            vec1
-                        });
+            let _ = out_chan.send((size, buff));
+            //let input2 = input.clone();
 
-                    let mut buff = Vec::new();
-                    for (_key, val) in indexed.iter().enumerate() {
-                        if let Some(v) = val {
-                            let slice = v[..buff_size.min(v.len())].to_vec();
-                            buff.extend(slice.clone());
-                        }
-
-                        if buff.len() >= buff_size {
-                            break;
-                        }
-                    }
-                    buff.reverse();
-                    (all_lines, buff)
-                })
-                .await
-                .expect("");
-                all_lines = new_all_lines;
-                let _ = out_chan.send((all_lines.len(), buff));
-            } else {
-                let al = all_lines[..buff_size.min(all_lines.len())].to_vec();
-                let _ = out_chan.send((all_lines.len(), al));
-            }
+            // if !query.is_empty() {
+            //     let (new_all_lines, buff) = tokio::task::spawn_blocking(move || {
+            //         let indexed = all_lines
+            //             .par_iter()
+            //             .filter_map(|(line, _)| {
+            //                 helpers::fuzzy_search(input2.as_str(), line.as_str())
+            //             })
+            //             .fold(Vec::new, |mut acc, (s, v)| {
+            //                 let delta = helpers::get_delta(&v);
+            //                 let key = delta.min(score_clamp);
+            //                 helpers::vec_insert_expand(&mut acc, key, (s, v));
+            //                 acc
+            //             })
+            //             .reduce(Vec::new, |mut vec1, vec2| {
+            //                 if vec2.len() > vec1.len() {
+            //                     vec1.resize(vec2.len(), None);
+            //                 }
+            //                 for (i, maybe_vec) in vec2.into_iter().enumerate() {
+            //                     if let Some(mut v) = maybe_vec {
+            //                         vec1[i].get_or_insert_with(Vec::new).append(&mut v);
+            //                     }
+            //                 }
+            //                 vec1
+            //             });
+            //
+            //         let mut buff = Vec::new();
+            //         for (_key, val) in indexed.iter().enumerate() {
+            //             if let Some(v) = val {
+            //                 let slice = v[..buff_size.min(v.len())].to_vec();
+            //                 buff.extend(slice.clone());
+            //             }
+            //
+            //             if buff.len() >= buff_size {
+            //                 break;
+            //             }
+            //         }
+            //         buff.reverse();
+            //         (all_lines, buff)
+            //     })
+            //     .await
+            //     .expect("");
+            //     all_lines = new_all_lines;
+            //     let _ = out_chan.send((all_lines.len(), buff));
+            // } else {
+            //     let al = all_lines[..buff_size.min(all_lines.len())].to_vec();
+            //     let _ = out_chan.send((all_lines.len(), al));
+            // }
         }
     });
 }
