@@ -144,7 +144,9 @@ pub fn render(
                     }
                     let visible_len = filtered_lines.len().min(list_height);
                     let index_from_bottom =
-                        selected.unwrap_or(0).min(visible_len.saturating_sub(1));
+                        selected
+                        .unwrap_or(0)
+                        .min(visible_len.saturating_sub(1));
                     let index_from_top = visible_len
                         .saturating_sub(1)
                         .saturating_sub(index_from_bottom);
@@ -195,7 +197,6 @@ pub fn render(
                     f.render_stateful_widget(list, chunks[0], &mut list_state);
                 })
                 .unwrap();
-            //tokio::time::sleep(Duration::from_millis(1)).await;
         }
     });
 }
@@ -217,7 +218,7 @@ pub fn handle_input(
         let mut start = SystemTime::now().duration_since(UNIX_EPOCH).expect("");
 
         loop {
-            tokio::task::yield_now().await;
+            tokio::time::sleep(Duration::ZERO).await;
             if let Ok(_) = event::poll(Duration::from_millis(50)) {
                 let res = match event::read() {
                     Ok(e) => helpers::parse_action(e),
