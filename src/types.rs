@@ -33,7 +33,7 @@ pub enum Action {
 #[command(version = "1.0")]
 #[command(about = "nada")]
 pub struct Args {
-    #[arg(short, long)]
+    #[arg(long)]
     pub buffsize: Option<usize>,
 
     #[arg(short, long)]
