@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::sync::watch::channel::<(usize, Vec<(String, Vec<usize>)>)>((0, Vec::new()));
     let (movement_send, movement_recv) = tokio::sync::mpsc::unbounded_channel::<types::Movement>();
     let (all_line_send, all_lines_recv) =
-        tokio::sync::mpsc::unbounded_channel::<Vec<(String, Vec<usize>)>>();
+        tokio::sync::mpsc::unbounded_channel::<Vec<String>>();
 
     let list_state = ListState::default();
 

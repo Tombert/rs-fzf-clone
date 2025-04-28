@@ -23,14 +23,14 @@ use crate::{helpers, types};
 
 pub fn stdin_reader(
     reader: BufReader<Stdin>,
-    out_chan: UnboundedSender<Vec<(String, Vec<usize>)>>,
+    out_chan: UnboundedSender<Vec<String>>,
     batch_size: usize,
 ) {
     let mut lines = reader.lines();
     tokio::spawn(async move {
         let mut buff = Vec::new();
         while let Ok(Some(line)) = lines.next_line().await {
-            buff.push((line, Vec::new()));
+            buff.push(line);
 
             if buff.len() >= batch_size {
                 let _ = out_chan.send(buff);
@@ -294,7 +294,7 @@ pub fn handle_input(
 pub fn process_input(
     mut in_chan: Receiver<Option<String>>,
     out_chan: Sender<(usize, Vec<(String, Vec<usize>)>)>,
-    mut source_chan: UnboundedReceiver<Vec<(String, Vec<usize>)>>,
+    mut source_chan: UnboundedReceiver<Vec<String>>,
     buff_size: usize,
     score_clamp: usize,
 ) {
@@ -335,7 +335,7 @@ pub fn process_input(
                 },
                 new_lines = source_chan.recv() => {
                     if let Some(x) = new_lines {
-                        for (i,_zz) in x {
+                        for i in x {
                             let z = helpers::fuzzy_search(input.as_str(), i.as_str());
                             match z {
                                 Some((line, zzz)) => {
