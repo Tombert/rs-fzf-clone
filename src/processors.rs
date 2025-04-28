@@ -320,7 +320,7 @@ pub fn process_input(
                                 let search_res = helpers::fuzzy_search(ni.as_str(), i.as_str() ); 
                                 match search_res {
                                     Some((line, vv) ) => {
-                                        let delta = helpers::get_delta(&vv);
+                                        let delta = helpers::get_delta(&vv).min(70);
                                         helpers::vec_insert_expand(&mut new_index, delta, (line, vv))
                                     },
                                     None => {
@@ -339,7 +339,7 @@ pub fn process_input(
                             let z = helpers::fuzzy_search(input.as_str(), i.as_str());
                             match z {
                                 Some((line, zzz)) => {
-                                    let delta = helpers::get_delta(&zzz);
+                                    let delta = helpers::get_delta(&zzz).min(70);
                                     helpers::vec_insert_expand(&mut index, delta, (line,zzz));
                                 }, 
                                 None => {
@@ -352,6 +352,7 @@ pub fn process_input(
                 }
             };
             let mut buff = Vec::new(); 
+
             let size = index.iter().fold(0, |a, b| {
                 let mut ns = 0; 
                 if let Some(bb) = b {
@@ -375,55 +376,6 @@ pub fn process_input(
             buff.reverse(); 
 
             let _ = out_chan.send((size, buff));
-            //let input2 = input.clone();
-
-            // if !query.is_empty() {
-            //     let (new_all_lines, buff) = tokio::task::spawn_blocking(move || {
-            //         let indexed = all_lines
-            //             .par_iter()
-            //             .filter_map(|(line, _)| {
-            //                 helpers::fuzzy_search(input2.as_str(), line.as_str())
-            //             })
-            //             .fold(Vec::new, |mut acc, (s, v)| {
-            //                 let delta = helpers::get_delta(&v);
-            //                 let key = delta.min(score_clamp);
-            //                 helpers::vec_insert_expand(&mut acc, key, (s, v));
-            //                 acc
-            //             })
-            //             .reduce(Vec::new, |mut vec1, vec2| {
-            //                 if vec2.len() > vec1.len() {
-            //                     vec1.resize(vec2.len(), None);
-            //                 }
-            //                 for (i, maybe_vec) in vec2.into_iter().enumerate() {
-            //                     if let Some(mut v) = maybe_vec {
-            //                         vec1[i].get_or_insert_with(Vec::new).append(&mut v);
-            //                     }
-            //                 }
-            //                 vec1
-            //             });
-            //
-            //         let mut buff = Vec::new();
-            //         for (_key, val) in indexed.iter().enumerate() {
-            //             if let Some(v) = val {
-            //                 let slice = v[..buff_size.min(v.len())].to_vec();
-            //                 buff.extend(slice.clone());
-            //             }
-            //
-            //             if buff.len() >= buff_size {
-            //                 break;
-            //             }
-            //         }
-            //         buff.reverse();
-            //         (all_lines, buff)
-            //     })
-            //     .await
-            //     .expect("");
-            //     all_lines = new_all_lines;
-            //     let _ = out_chan.send((all_lines.len(), buff));
-            // } else {
-            //     let al = all_lines[..buff_size.min(all_lines.len())].to_vec();
-            //     let _ = out_chan.send((all_lines.len(), al));
-            // }
         }
     });
 }
