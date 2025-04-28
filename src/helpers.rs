@@ -30,6 +30,22 @@ pub fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
     ListItem::new(Text::from(vec![Line::from(spans)]))
 }
 
+pub fn index_items (new_index: &mut Vec<Option<Vec<(String, Vec<usize>)>>>, line : &String ,ni : &String, score_clamp: usize){
+    let search_res = fuzzy_search(ni.as_str(), line.as_str() ); 
+    match search_res {
+        Some((line, vv) ) => {
+            let delta = get_delta(&vv).min(score_clamp);
+            vec_insert_expand(new_index, delta, (line, vv))
+        },
+        None => {
+            vec_insert_expand(new_index, score_clamp, (line.clone(),Vec::new()));
+        }
+    }
+
+}
+
+
+
 pub fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
     let mut input_index = 0;
     let input_chars: Vec<char> = input.chars().collect();

@@ -316,16 +316,7 @@ pub fn process_input(
                     for  val in &index {
                         if let Some(v) = val {
                             for (i,_) in v {
-                                let search_res = helpers::fuzzy_search(ni.as_str(), i.as_str() ); 
-                                match search_res {
-                                    Some((line, vv) ) => {
-                                        let delta = helpers::get_delta(&vv).min(score_clamp);
-                                        helpers::vec_insert_expand(&mut new_index, delta, (line, vv))
-                                    },
-                                    None => {
-                                        helpers::vec_insert_expand(&mut new_index, score_clamp, (i.clone(),Vec::new()));
-                                    }
-                                }
+                                helpers::index_items(&mut new_index, i, &ni, score_clamp);
                             }
                         }
                     }
@@ -335,16 +326,7 @@ pub fn process_input(
                 new_lines = source_chan.recv() => {
                     if let Some(x) = new_lines {
                         for i in x {
-                            let z = helpers::fuzzy_search(input.as_str(), i.as_str());
-                            match z {
-                                Some((line, zzz)) => {
-                                    let delta = helpers::get_delta(&zzz).min(score_clamp);
-                                    helpers::vec_insert_expand(&mut index, delta, (line,zzz));
-                                }, 
-                                None => {
-                                    helpers::vec_insert_expand(&mut index, score_clamp, (i,Vec::new()));
-                                }
-                            }
+                                helpers::index_items(&mut index, &i, &input, score_clamp);
                         }
                     }
                     input
