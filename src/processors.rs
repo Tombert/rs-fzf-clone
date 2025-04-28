@@ -142,7 +142,7 @@ pub fn render(
                     let index_from_bottom = selected.unwrap_or(0);
                     let max_idx = filtered_lines.len().saturating_sub(1);
                     let index_from_top = max_idx.saturating_sub(index_from_bottom);
-                    real_selected = Some(padding_rows + index_from_top.saturating_sub(start_idx));
+                    real_selected = Some(padding_rows + index_from_top);
 
                     let label = format!("[ {}/{} ]", selected.unwrap_or(0) + 1, lines);
                     let label_width = label.len() as u16;
@@ -173,7 +173,7 @@ pub fn render(
                             .chain(
                                 filtered_lines
                                     .iter()
-                                    .take(list_height)
+                                    .skip(filtered_lines.len().saturating_sub(list_height))
                                     .map(|(line, hits)| helpers::styled_line(line, hits)),
                             )
                             .collect::<Vec<_>>();
@@ -189,7 +189,7 @@ pub fn render(
                     f.render_stateful_widget(list, chunks[0], &mut list_state);
                 })
                 .unwrap();
-            tokio::task::yield_now().await;
+            tokio::time::sleep(Duration::from_millis(1)).await;
         }
     });
 }
@@ -326,12 +326,13 @@ pub fn process_input(
                             let key = helpers::get_delta(&v);
                             acc.entry(key).or_insert_with(Vec::new).push((s, v));
                             acc
-                        }).reduce(HashMap::new, |mut map1, map2| {
-                         for (key, mut vec) in map2 {
-                             map1.entry(key).or_insert_with(Vec::new).append(&mut vec);
-                         }
-                         map1
-                     });
+                        })
+                        .reduce(HashMap::new, |mut map1, map2| {
+                            for (key, mut vec) in map2 {
+                                map1.entry(key).or_insert_with(Vec::new).append(&mut vec);
+                            }
+                            map1
+                        });
 
                     let mut buff = Vec::new();
                     for key in indexed.keys().sorted().cloned() {
@@ -354,6 +355,7 @@ pub fn process_input(
                 let al = all_lines[..BUFF_SIZE.min(all_lines.len())].to_vec();
                 let _ = out_chan.send((all_lines.len(), al));
             }
+            tokio::time::sleep(Duration::from_millis(1)).await;
         }
     });
 }
