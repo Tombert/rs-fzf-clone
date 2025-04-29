@@ -144,9 +144,7 @@ pub fn render(
                     }
                     let visible_len = filtered_lines.len().min(list_height);
                     let index_from_bottom =
-                        selected
-                        .unwrap_or(0)
-                        .min(visible_len.saturating_sub(1));
+                        selected.unwrap_or(0).min(visible_len.saturating_sub(1));
                     let index_from_top = visible_len
                         .saturating_sub(1)
                         .saturating_sub(index_from_bottom);
@@ -299,12 +297,12 @@ pub fn process_input(
     send_source_chan: UnboundedSender<Vec<String>>,
     buff_size: usize,
     score_clamp: usize,
-    batch_size: usize
+    batch_size: usize,
 ) {
     let mut input = String::new();
     tokio::spawn(async move {
         //let mut all_lines = Vec::new();
-        let mut index :  Vec<Option<Vec<(String, Vec<usize>)>>> = Vec::new();
+        let mut index: Vec<Option<Vec<(String, Vec<usize>)>>> = Vec::new();
         loop {
             let query = tokio::select! {
                 _ = in_chan.changed() => {
@@ -314,7 +312,7 @@ pub fn process_input(
                         None => input
                     };
 
-                    let mut buff = Vec::new(); 
+                    let mut buff = Vec::new();
 
                     for  val in index {
                         if let Some(v) = val {
@@ -322,14 +320,14 @@ pub fn process_input(
                                 buff.push(i);
                                 if buff.len() >= batch_size {
                                     let _ = send_source_chan.send(buff);
-                                    buff = Vec::new(); 
+                                    buff = Vec::new();
                                 }
                             }
                         }
                     }
 
                     let _ = send_source_chan.send(buff);
-                    index = Vec::new(); 
+                    index = Vec::new();
                     ni
                 },
                 new_lines = source_chan.recv() => {
@@ -343,31 +341,28 @@ pub fn process_input(
             };
 
             input = query.clone();
-                let mut buff = Vec::new(); 
+            let mut buff = Vec::new();
 
-                let size = index.iter().fold(0, |a, b| {
-                    let mut ns = 0; 
-                    if let Some(bb) = b {
-                        ns += bb.len(); 
-
-                    }
-                    ns + a
-                });
-                for i in &index {
-
-                    if let Some(j) = i {
-                        let slice = j[..buff_size.min(j.len())].to_vec();
-                        buff.extend(slice); 
-                    }
-                    if buff.len() > buff_size {
-                        break; 
-
-                    }
+            let size = index.iter().fold(0, |a, b| {
+                let mut ns = 0;
+                if let Some(bb) = b {
+                    ns += bb.len();
                 }
+                ns + a
+            });
+            for i in &index {
+                if let Some(j) = i {
+                    let slice = j[..buff_size.min(j.len())].to_vec();
+                    buff.extend(slice);
+                }
+                if buff.len() > buff_size {
+                    break;
+                }
+            }
 
-                buff.reverse(); 
+            buff.reverse();
 
-                let _ = out_chan.send((size, buff));
+            let _ = out_chan.send((size, buff));
             //}
         }
     });

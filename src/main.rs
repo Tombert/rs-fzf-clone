@@ -33,8 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (processed_send, processed_recv) =
         tokio::sync::watch::channel::<(usize, Vec<(String, Vec<usize>)>)>((0, Vec::new()));
     let (movement_send, movement_recv) = tokio::sync::mpsc::unbounded_channel::<types::Movement>();
-    let (all_line_send, all_lines_recv) =
-        tokio::sync::mpsc::unbounded_channel::<Vec<String>>();
+    let (all_line_send, all_lines_recv) = tokio::sync::mpsc::unbounded_channel::<Vec<String>>();
 
     let list_state = ListState::default();
 
@@ -54,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         all_line_send.clone(),
         buffsize,
         scoreclamp,
-        batchsize
+        batchsize,
     );
     processors::stdin_reader(reader, all_line_send.clone(), batchsize);
 
