@@ -296,9 +296,10 @@ pub fn process_input(
     mut in_chan: Receiver<Option<String>>,
     out_chan: Sender<(usize, Vec<(String, Vec<usize>)>)>,
     mut source_chan: UnboundedReceiver<Vec<String>>,
-    mut send_source_chan: UnboundedSender<Vec<String>>,
+    send_source_chan: UnboundedSender<Vec<String>>,
     buff_size: usize,
     score_clamp: usize,
+    batch_size: usize
 ) {
     let mut input = String::new();
     tokio::spawn(async move {
@@ -313,14 +314,13 @@ pub fn process_input(
                         None => input
                     };
 
-                    //let mut new_index :  Vec<Option<Vec<(String, Vec<usize>)>>> = Vec::new();
                     let mut buff = Vec::new(); 
 
                     for  val in index {
                         if let Some(v) = val {
                             for (i,_) in v {
                                 buff.push(i);
-                                if buff.len() >= 300 {
+                                if buff.len() >= batch_size {
                                     let _ = send_source_chan.send(buff);
                                     buff = Vec::new(); 
                                 }
@@ -330,7 +330,6 @@ pub fn process_input(
 
                     let _ = send_source_chan.send(buff);
                     index = Vec::new(); 
-                    //index = new_index.clone(); 
                     ni
                 },
                 new_lines = source_chan.recv() => {
@@ -344,7 +343,6 @@ pub fn process_input(
             };
 
             input = query.clone();
-            //if !index.is_empty() {
                 let mut buff = Vec::new(); 
 
                 let size = index.iter().fold(0, |a, b| {
@@ -356,6 +354,7 @@ pub fn process_input(
                     ns + a
                 });
                 for i in &index {
+
                     if let Some(j) = i {
                         let slice = j[..buff_size.min(j.len())].to_vec();
                         buff.extend(slice); 
