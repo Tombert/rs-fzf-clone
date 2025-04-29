@@ -51,8 +51,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         input_recv,
         processed_send.clone(),
         all_lines_recv,
+        all_line_send.clone(),
         buffsize,
         scoreclamp,
+        batchsize
     );
     processors::stdin_reader(reader, all_line_send.clone(), batchsize);
 
