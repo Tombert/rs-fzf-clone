@@ -301,7 +301,6 @@ pub fn process_input(
 ) {
     let mut input = String::new();
     tokio::spawn(async move {
-        //let mut all_lines = Vec::new();
         let mut index: Vec<Option<Vec<(String, Vec<usize>)>>> = Vec::new();
         let mut count = 0; 
         loop {
@@ -365,7 +364,6 @@ pub fn process_input(
             buff.reverse();
 
             let _ = out_chan.send((count, buff));
-            //}
         }
     });
 }
