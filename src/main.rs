@@ -51,6 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         input_recv,
         processed_send.clone(),
         all_lines_recv,
+        all_line_send.clone(),
         buffsize,
         scoreclamp,
     );

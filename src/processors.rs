@@ -296,6 +296,7 @@ pub fn process_input(
     mut in_chan: Receiver<Option<String>>,
     out_chan: Sender<(usize, Vec<(String, Vec<usize>)>)>,
     mut source_chan: UnboundedReceiver<Vec<String>>,
+    mut send_source_chan: UnboundedSender<Vec<String>>,
     buff_size: usize,
     score_clamp: usize,
 ) {
@@ -312,52 +313,63 @@ pub fn process_input(
                         None => input
                     };
 
-                    let mut new_index :  Vec<Option<Vec<(String, Vec<usize>)>>> = Vec::new();
+                    //let mut new_index :  Vec<Option<Vec<(String, Vec<usize>)>>> = Vec::new();
+                    let mut buff = Vec::new(); 
 
-                    for  val in &index {
+                    for  val in index {
                         if let Some(v) = val {
                             for (i,_) in v {
-                                helpers::index_items(&mut new_index, i, &ni, score_clamp);
+                                buff.push(i);
+                                if buff.len() >= 300 {
+                                    let _ = send_source_chan.send(buff);
+                                    buff = Vec::new(); 
+                                }
                             }
                         }
                     }
-                    index = new_index.clone(); 
+
+                    let _ = send_source_chan.send(buff);
+                    index = Vec::new(); 
+                    //index = new_index.clone(); 
                     ni
                 },
                 new_lines = source_chan.recv() => {
                     if let Some(x) = new_lines {
                         for i in x {
-                                helpers::index_items(&mut index, &i, &input, score_clamp);
+                            helpers::index_items(&mut index, &i, &input, score_clamp);
                         }
                     }
                     input
                 }
             };
-            let mut buff = Vec::new(); 
-
-            let size = index.iter().fold(0, |a, b| {
-                let mut ns = 0; 
-                if let Some(bb) = b {
-                    ns += bb.len(); 
-
-                }
-                ns + a
-            });
-            for i in &index {
-                if let Some(j) = i {
-                    let slice = j[..buff_size.min(j.len())].to_vec();
-                    buff.extend(slice); 
-                }
-                if buff.len() > buff_size {
-                    break; 
-
-                }
-            }
 
             input = query.clone();
-            buff.reverse(); 
+            //if !index.is_empty() {
+                let mut buff = Vec::new(); 
 
-            let _ = out_chan.send((size, buff));
+                let size = index.iter().fold(0, |a, b| {
+                    let mut ns = 0; 
+                    if let Some(bb) = b {
+                        ns += bb.len(); 
+
+                    }
+                    ns + a
+                });
+                for i in &index {
+                    if let Some(j) = i {
+                        let slice = j[..buff_size.min(j.len())].to_vec();
+                        buff.extend(slice); 
+                    }
+                    if buff.len() > buff_size {
+                        break; 
+
+                    }
+                }
+
+                buff.reverse(); 
+
+                let _ = out_chan.send((size, buff));
+            //}
         }
     });
 }
