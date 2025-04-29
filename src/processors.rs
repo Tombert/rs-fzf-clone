@@ -303,6 +303,7 @@ pub fn process_input(
     tokio::spawn(async move {
         //let mut all_lines = Vec::new();
         let mut index: Vec<Option<Vec<(String, Vec<usize>)>>> = Vec::new();
+        let mut count = 0; 
         loop {
             let query = tokio::select! {
                 _ = in_chan.changed() => {
@@ -343,13 +344,14 @@ pub fn process_input(
             input = query.clone();
             let mut buff = Vec::new();
 
-            let size = index.iter().fold(0, |a, b| {
+            let new_size = index.iter().fold(0, |a, b| {
                 let mut ns = 0;
                 if let Some(bb) = b {
                     ns += bb.len();
                 }
                 ns + a
             });
+            count = count.max(new_size);
             for i in &index {
                 if let Some(j) = i {
                     let slice = j[..buff_size.min(j.len())].to_vec();
@@ -362,7 +364,7 @@ pub fn process_input(
 
             buff.reverse();
 
-            let _ = out_chan.send((size, buff));
+            let _ = out_chan.send((count, buff));
             //}
         }
     });
