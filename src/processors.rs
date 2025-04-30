@@ -37,7 +37,7 @@ pub fn stdin_reader(
                 buff = Vec::new();
             }
         }
-        let _ = out_chan.send(buff.clone());
+        let _ = out_chan.send(buff);
     });
 }
 

@@ -49,26 +49,6 @@ pub fn index_items(
     vec_insert_expand(new_index, delta, (line, hits));
 }
 
-
-// pub fn index_items(
-//     new_index: &mut Vec<Option<Vec<(String, Vec<usize>)>>>,
-//     line: String,
-//     ni: String,
-//     score_clamp: usize,
-// ) -> String {
-//     let search_res = fuzzy_search(ni.as_str(), line.as_str());
-//     match search_res {
-//         Some( vv) => {
-//             let delta = get_delta(&vv).min(score_clamp);
-//             vec_insert_expand(new_index, delta, (line, vv))
-//         }
-//         None => {
-//             vec_insert_expand(new_index, score_clamp, (line, Vec::new()));
-//         }
-//     }
-//     line
-// }
-
 pub fn fuzzy_search(input: &str, line: &str) -> Option< Vec<usize>> {
     let mut input_index = 0;
     let input_chars: Vec<char> = input.chars().collect();
