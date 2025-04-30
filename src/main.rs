@@ -17,6 +17,7 @@ use std::io::{self};
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = types::Args::parse();
+    let preview = args.preview.unwrap_or(false);
 
     let buffsize = args.buffsize.unwrap_or(100);
     let batchsize = args.batchsize.unwrap_or(50);
@@ -57,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     processors::stdin_reader(reader, all_line_send.clone(), batchsize);
 
-    processors::render(terminal, list_state, processed_recv, ui_recv, movement_recv);
+    processors::render(terminal, list_state, processed_recv, ui_recv, movement_recv, preview);
     futures::future::pending::<()>().await;
     Ok(())
 }

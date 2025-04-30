@@ -5,6 +5,7 @@ use ratatui::{
     text::{Line, Span, Text},
     widgets::ListItem,
 };
+use tokio::{fs::File, io::{AsyncReadExt, BufReader}};
 
 pub fn vec_insert_expand<T>(vec: &mut Vec<Option<Vec<T>>>, index: usize, value: T) {
     if vec.len() <= index {
@@ -28,6 +29,23 @@ pub fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
         }
     }
     ListItem::new(Text::from(vec![Line::from(spans)]))
+}
+
+pub async fn is_probably_text_file(path: &str) -> std::io::Result<bool> {
+    let file = File::open(path).await?;
+    let mut reader = BufReader::new(file);
+    let mut buffer = [0u8; 1024];
+
+    let n = reader.read(&mut buffer).await?;
+
+    // Try to convert to UTF-8
+    match std::str::from_utf8(&buffer[..n]) {
+        Ok(text) => {
+            // Optionally: do more checks here, like making sure it's not all control characters
+            Ok(!text.chars().all(|c| c.is_control()))
+        }
+        Err(_) => Ok(false),
+    }
 }
 
 pub fn index_items(
