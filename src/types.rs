@@ -36,7 +36,6 @@ pub struct Args {
     #[arg(long)]
     pub buffsize: Option<usize>,
 
-
     #[arg(short, long)]
     pub preview: Option<bool>,
 

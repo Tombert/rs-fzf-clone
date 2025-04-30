@@ -86,145 +86,151 @@ pub fn render(
             };
 
             tokio::task::block_in_place(|| {
-                terminal.draw(|f| {
-                    let size = f.size();
-                    let layout = Layout::default()
-                        .direction(Direction::Horizontal)
-                        .constraints(if preview {
-                            vec![Constraint::Percentage(70), Constraint::Percentage(30)]
+                terminal
+                    .draw(|f| {
+                        let size = f.size();
+                        let layout = Layout::default()
+                            .direction(Direction::Horizontal)
+                            .constraints(if preview {
+                                vec![Constraint::Percentage(70), Constraint::Percentage(30)]
+                            } else {
+                                vec![Constraint::Percentage(100)]
+                            })
+                            .split(size);
+
+                        let left_layout = Layout::default()
+                            .direction(Direction::Vertical)
+                            .margin(1)
+                            .constraints([
+                                Constraint::Min(1),
+                                Constraint::Length(1),
+                                Constraint::Length(3),
+                            ])
+                            .split(layout[0]);
+
+                        let ui = ui_stuff.clone().unwrap_or(types::UIStuff {
+                            cursor_position: 0,
+                            input: String::new(),
+                            enter: false,
+                        });
+
+                        let list_height = left_layout[0].height as usize;
+                        let actual_items_to_show = filtered_lines.len().min(list_height);
+                        let padding_rows = list_height.saturating_sub(actual_items_to_show);
+                        let start_idx = if filtered_lines.len() > list_height {
+                            filtered_lines.len() - list_height
                         } else {
-                            vec![Constraint::Percentage(100)]
-                        })
-                        .split(size);
+                            0
+                        };
 
-                    let left_layout = Layout::default()
-                        .direction(Direction::Vertical)
-                        .margin(1)
-                        .constraints([
-                            Constraint::Min(1),
-                            Constraint::Length(1),
-                            Constraint::Length(3),
-                        ])
-                        .split(layout[0]);
-
-                    let ui = ui_stuff.clone().unwrap_or(types::UIStuff {
-                        cursor_position: 0,
-                        input: String::new(),
-                        enter: false,
-                    });
-
-                    let list_height = left_layout[0].height as usize;
-                    let actual_items_to_show = filtered_lines.len().min(list_height);
-                    let padding_rows = list_height.saturating_sub(actual_items_to_show);
-                    let start_idx = if filtered_lines.len() > list_height {
-                        filtered_lines.len() - list_height
-                    } else {
-                        0
-                    };
-
-                    if let Some(m) = movement {
-                        match m {
-                            types::Movement::Down => {
-                                let current_selected = selected.unwrap_or(0);
-                                if current_selected > 0 {
-                                    selected = Some(current_selected - 1);
+                        if let Some(m) = movement {
+                            match m {
+                                types::Movement::Down => {
+                                    let current_selected = selected.unwrap_or(0);
+                                    if current_selected > 0 {
+                                        selected = Some(current_selected - 1);
+                                    }
                                 }
-                            }
-                            types::Movement::Up => {
-                                let current_selected = selected.unwrap_or(0);
-                                let new_selected = current_selected + 1;
-                                selected = Some(new_selected);
-                            }
-                            types::Movement::Enter => {
-                                if let Some(sel) = real_selected {
-                                    let selected_idx = sel.saturating_sub(padding_rows) + start_idx;
-                                    if let Some(line) = filtered_lines.get(selected_idx) {
-                                        let _ = disable_raw_mode();
-                                        let _ = execute!(io::stderr(), LeaveAlternateScreen);
-                                        println!("{}", line.0);
-                                        std::process::exit(0);
+                                types::Movement::Up => {
+                                    let current_selected = selected.unwrap_or(0);
+                                    let new_selected = current_selected + 1;
+                                    selected = Some(new_selected);
+                                }
+                                types::Movement::Enter => {
+                                    if let Some(sel) = real_selected {
+                                        let selected_idx =
+                                            sel.saturating_sub(padding_rows) + start_idx;
+                                        if let Some(line) = filtered_lines.get(selected_idx) {
+                                            let _ = disable_raw_mode();
+                                            let _ = execute!(io::stderr(), LeaveAlternateScreen);
+                                            println!("{}", line.0);
+                                            std::process::exit(0);
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    let visible_len = filtered_lines.len().min(list_height);
-                    let index_from_bottom =
-                        selected.unwrap_or(0).min(visible_len.saturating_sub(1));
-                    let index_from_top = visible_len
-                        .saturating_sub(1)
-                        .saturating_sub(index_from_bottom);
-                    real_selected = Some(padding_rows + index_from_top);
+                        let visible_len = filtered_lines.len().min(list_height);
+                        let index_from_bottom =
+                            selected.unwrap_or(0).min(visible_len.saturating_sub(1));
+                        let index_from_top = visible_len
+                            .saturating_sub(1)
+                            .saturating_sub(index_from_bottom);
+                        real_selected = Some(padding_rows + index_from_top);
 
-                    // preview logic
-                    preview_text = if preview {
-                        real_selected.and_then(|sel| {
-                            let selected_idx = sel.saturating_sub(padding_rows) + start_idx;
-                            filtered_lines.get(selected_idx).and_then(|(line, _)| {
-                                let result = tokio::runtime::Handle::current()
-                                    .block_on(helpers::is_probably_text_file(line));
-                                match result {
-                                    Ok(true) => tokio::runtime::Handle::current()
-                                        .block_on(tokio::fs::read_to_string(line))
-                                        .ok()
-                                        .map(|s| s.chars().take(1000).collect()),
-                                    _ => None,
-                                }
+                        // preview logic
+                        preview_text = if preview {
+                            real_selected.and_then(|sel| {
+                                let selected_idx = sel.saturating_sub(padding_rows) + start_idx;
+                                filtered_lines.get(selected_idx).and_then(|(line, _)| {
+                                    let result = tokio::runtime::Handle::current()
+                                        .block_on(helpers::is_probably_text_file(line));
+                                    match result {
+                                        Ok(true) => tokio::runtime::Handle::current()
+                                            .block_on(tokio::fs::read_to_string(line))
+                                            .ok()
+                                            .map(|s| s.chars().take(1000).collect()),
+                                        _ => None,
+                                    }
+                                })
                             })
-                        })
-                    } else {
-                        None
-                    };
+                        } else {
+                            None
+                        };
 
-                    let label = format!("[ {}/{} ]", selected.unwrap_or(0) + 1, lines);
-                    let label_width = label.len() as u16;
-                    let divider_fill = if left_layout[1].width > label_width {
-                        "─".repeat((left_layout[1].width - label_width - 1) as usize)
-                    } else {
-                        String::new()
-                    };
+                        let label = format!("[ {}/{} ]", selected.unwrap_or(0) + 1, lines);
+                        let label_width = label.len() as u16;
+                        let divider_fill = if left_layout[1].width > label_width {
+                            "─".repeat((left_layout[1].width - label_width - 1) as usize)
+                        } else {
+                            String::new()
+                        };
 
-                    let divider_line = Paragraph::new(Line::from(vec![
-                        Span::styled(label, Style::default().fg(Color::LightGreen)),
-                        Span::raw(" "),
-                        Span::styled(divider_fill, Style::default().fg(Color::LightCyan)),
-                    ]));
-                    f.render_widget(divider_line, left_layout[1]);
+                        let divider_line = Paragraph::new(Line::from(vec![
+                            Span::styled(label, Style::default().fg(Color::LightGreen)),
+                            Span::raw(" "),
+                            Span::styled(divider_fill, Style::default().fg(Color::LightCyan)),
+                        ]));
+                        f.render_widget(divider_line, left_layout[1]);
 
-                    let input_para = Paragraph::new(Text::from(vec![Line::from(vec![
-                        Span::styled("> ", Style::default().fg(Color::Blue)),
-                        Span::raw(ui.clone().input),
-                    ])]))
-                    .block(Block::default().borders(Borders::NONE));
-                    f.render_widget(input_para, left_layout[2]);
-                    f.set_cursor(left_layout[2].x + 2 + ui.cursor_position as u16, left_layout[2].y);
+                        let input_para = Paragraph::new(Text::from(vec![Line::from(vec![
+                            Span::styled("> ", Style::default().fg(Color::Blue)),
+                            Span::raw(ui.clone().input),
+                        ])]))
+                        .block(Block::default().borders(Borders::NONE));
+                        f.render_widget(input_para, left_layout[2]);
+                        f.set_cursor(
+                            left_layout[2].x + 2 + ui.cursor_position as u16,
+                            left_layout[2].y,
+                        );
 
-                    let items_to_render = (0..padding_rows)
-                        .map(|_| ListItem::new(""))
-                        .chain(
-                            filtered_lines
-                                .iter()
-                                .skip(filtered_lines.len().saturating_sub(list_height))
-                                .map(|(line, hits)| helpers::styled_line(line, hits)),
-                        )
-                        .collect::<Vec<_>>();
+                        let items_to_render = (0..padding_rows)
+                            .map(|_| ListItem::new(""))
+                            .chain(
+                                filtered_lines
+                                    .iter()
+                                    .skip(filtered_lines.len().saturating_sub(list_height))
+                                    .map(|(line, hits)| helpers::styled_line(line, hits)),
+                            )
+                            .collect::<Vec<_>>();
 
-                    let list = List::new(items_to_render)
-                        .block(Block::default().borders(Borders::NONE))
-                        .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+                        let list = List::new(items_to_render)
+                            .block(Block::default().borders(Borders::NONE))
+                            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
-                    list_state.select(real_selected);
-                    f.render_stateful_widget(list, left_layout[0], &mut list_state);
+                        list_state.select(real_selected);
+                        f.render_stateful_widget(list, left_layout[0], &mut list_state);
 
-                    if let (true, Some(preview_text)) = (preview, &preview_text) {
-                        if layout.len() > 1 {
-                            let right_block = Paragraph::new(preview_text.clone())
-                                .block(Block::default().title("Preview").borders(Borders::ALL));
-                            f.render_widget(right_block, layout[1]);
+                        if let (true, Some(preview_text)) = (preview, &preview_text) {
+                            if layout.len() > 1 {
+                                let right_block = Paragraph::new(preview_text.clone())
+                                    .block(Block::default().title("Preview").borders(Borders::ALL));
+                                f.render_widget(right_block, layout[1]);
+                            }
                         }
-                    }
-                }).unwrap();
+                    })
+                    .unwrap();
             });
         }
     });
@@ -333,7 +339,7 @@ pub fn process_input(
     let mut input = String::new();
     tokio::spawn(async move {
         let mut index: Vec<Option<Vec<(String, Vec<usize>)>>> = Vec::new();
-        let mut count = 0; 
+        let mut count = 0;
         loop {
             let query = tokio::select! {
                 _ = in_chan.changed() => {

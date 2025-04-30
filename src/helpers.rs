@@ -5,7 +5,10 @@ use ratatui::{
     text::{Line, Span, Text},
     widgets::ListItem,
 };
-use tokio::{fs::File, io::{AsyncReadExt, BufReader}};
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, BufReader},
+};
 
 pub fn vec_insert_expand<T>(vec: &mut Vec<Option<Vec<T>>>, index: usize, value: T) {
     if vec.len() <= index {
@@ -61,13 +64,12 @@ pub fn index_items(
         None => Vec::new(),
     };
 
-    let delta = get_delta(&hits).min(score_clamp);//.min(score_clamp);
-
+    let delta = get_delta(&hits).min(score_clamp); //.min(score_clamp);
 
     vec_insert_expand(new_index, delta, (line, hits));
 }
 
-pub fn fuzzy_search(input: &str, line: &str) -> Option< Vec<usize>> {
+pub fn fuzzy_search(input: &str, line: &str) -> Option<Vec<usize>> {
     let mut input_index = 0;
     let input_chars: Vec<char> = input.chars().collect();
     let input_length = input.len();

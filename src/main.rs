@@ -58,7 +58,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     processors::stdin_reader(reader, all_line_send.clone(), batchsize);
 
-    processors::render(terminal, list_state, processed_recv, ui_recv, movement_recv, preview);
+    processors::render(
+        terminal,
+        list_state,
+        processed_recv,
+        ui_recv,
+        movement_recv,
+        preview,
+    );
     futures::future::pending::<()>().await;
     Ok(())
 }
