@@ -47,6 +47,7 @@ pub fn render(
     mut new_data_chan: Receiver<(usize, Vec<(String, Vec<usize>)>)>,
     mut ui_chan: Receiver<types::UIStuff>,
     mut movement_chan: UnboundedReceiver<types::Movement>,
+    preview: bool,
 ) {
     tokio::spawn(async move {
         let mut filtered_lines: Vec<(String, Vec<usize>)> = Vec::new();
