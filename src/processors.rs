@@ -333,7 +333,7 @@ pub fn process_input(
                 new_lines = source_chan.recv() => {
                     if let Some(x) = new_lines {
                         for i in x {
-                            helpers::index_items(&mut index, &i, &input, score_clamp);
+                            helpers::index_items(&mut index, i, &input, score_clamp);
                         }
                     }
                     input
@@ -361,7 +361,7 @@ pub fn process_input(
                 }
             }
 
-            buff.reverse();
+            //buff.reverse();
 
             let _ = out_chan.send((count, buff));
         }

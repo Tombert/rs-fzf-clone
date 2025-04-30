@@ -32,23 +32,44 @@ pub fn styled_line(line: &str, hits: &Vec<usize>) -> ListItem<'static> {
 
 pub fn index_items(
     new_index: &mut Vec<Option<Vec<(String, Vec<usize>)>>>,
-    line: &String,
-    ni: &String,
+    line: String,
+    ni: &str,
     score_clamp: usize,
 ) {
-    let search_res = fuzzy_search(ni.as_str(), line.as_str());
-    match search_res {
-        Some((line, vv)) => {
-            let delta = get_delta(&vv).min(score_clamp);
-            vec_insert_expand(new_index, delta, (line, vv))
-        }
-        None => {
-            vec_insert_expand(new_index, score_clamp, (line.clone(), Vec::new()));
-        }
-    }
+    let search_res = fuzzy_search(ni, &line);
+
+    let hits = match search_res {
+        Some(h) => h,
+        None => Vec::new(),
+    };
+
+    let delta = get_delta(&hits).min(score_clamp);//.min(score_clamp);
+
+
+    vec_insert_expand(new_index, delta, (line, hits));
 }
 
-pub fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
+
+// pub fn index_items(
+//     new_index: &mut Vec<Option<Vec<(String, Vec<usize>)>>>,
+//     line: String,
+//     ni: String,
+//     score_clamp: usize,
+// ) -> String {
+//     let search_res = fuzzy_search(ni.as_str(), line.as_str());
+//     match search_res {
+//         Some( vv) => {
+//             let delta = get_delta(&vv).min(score_clamp);
+//             vec_insert_expand(new_index, delta, (line, vv))
+//         }
+//         None => {
+//             vec_insert_expand(new_index, score_clamp, (line, Vec::new()));
+//         }
+//     }
+//     line
+// }
+
+pub fn fuzzy_search(input: &str, line: &str) -> Option< Vec<usize>> {
     let mut input_index = 0;
     let input_chars: Vec<char> = input.chars().collect();
     let input_length = input.len();
@@ -76,7 +97,7 @@ pub fn fuzzy_search(input: &str, line: &str) -> Option<(String, Vec<usize>)> {
     if input_index < input_length {
         return None;
     }
-    return Some((line.to_string(), hits));
+    return Some(hits);
 }
 
 pub fn get_delta(input: &Vec<usize>) -> usize {
